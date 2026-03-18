@@ -1,0 +1,21 @@
+{
+  "name": "cx-helper",
+  "version": "1.0.0",
+  "description": "超星学习通(学习通)自动学习助手",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "dev": "node build.js --watch"
+  },
+  "keywords": [
+    "tampermonkey",
+    "chaoxing",
+    "学习通",
+    "油猴脚本"
+  ],
+  "author": "kail",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+}

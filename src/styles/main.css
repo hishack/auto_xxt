@@ -1,0 +1,381 @@
+/* ============================================
+   超星学习通助手 - 面板样式
+   Author: kail
+   ============================================ */
+
+/* Panel: Modern Light Theme */
+#answer-helper-panel {
+    --ah-panel-height: 340px;
+    position: fixed;
+    top: 24px;
+    left: 24px;
+    width: 320px;
+    min-width: 320px;
+    max-width: 320px;
+    height: var(--ah-panel-height) !important;
+    min-height: var(--ah-panel-height) !important;
+    max-height: var(--ah-panel-height) !important;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 0;
+    z-index: 9999;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1f2937;
+    user-select: none;
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, height 0.3s ease;
+}
+
+/* Header */
+#answer-helper-header {
+    cursor: move;
+    height: 52px;
+    padding: 0 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 15px;
+    color: #111827;
+}
+
+#answer-helper-header .title {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    color: #111827;
+}
+
+#answer-helper-header .title .accent {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+#answer-helper-header .right {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#answer-helper-header .collapse-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #f9fafb;
+    border: 1px solid #f3f4f6;
+    cursor: pointer;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+#answer-helper-header .collapse-btn:hover {
+    background: #f3f4f6;
+    color: #111827;
+    border-color: #e5e7eb;
+    transform: scale(1.05);
+}
+
+.collapse-btn-inner {
+    width: 16px;
+    height: 16px;
+    position: relative;
+}
+
+.collapse-icon-bar.horizontal {
+    width: 14px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 1px;
+    position: absolute;
+    left: 1px;
+    top: 7px;
+}
+
+.collapse-icon-bar.vertical {
+    width: 2px;
+    height: 14px;
+    background: currentColor;
+    border-radius: 1px;
+    position: absolute;
+    left: 7px;
+    top: 1px;
+}
+
+/* Content */
+#answer-helper-content {
+    padding: 12px 16px;
+    overflow-y: auto;
+    height: calc(var(--ah-panel-height) - 52px);
+    max-height: calc(var(--ah-panel-height) - 52px);
+}
+
+#answer-helper-panel.collapsed #answer-helper-content {
+    display: none;
+}
+
+#answer-helper-panel.collapsed {
+    width: 240px;
+    min-width: 240px;
+    max-width: 240px;
+    height: 52px !important;
+    min-height: 52px !important;
+    border-radius: 12px;
+}
+
+/* Body: main on top, actions at bottom */
+#answer-helper-content .panel-body {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+        "main"
+        "actions";
+    gap: 12px;
+    align-items: start;
+}
+
+.panel-main {
+    min-width: 0;
+    grid-area: main;
+}
+
+.panel-actions {
+    grid-area: actions;
+}
+
+.panel-actions.panel-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.panel-actions.panel-row .primary-pair {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.panel-actions.panel-row .primary-pair .pair-slot {
+    flex: 1;
+    display: flex;
+}
+
+.panel-actions.panel-row .primary-pair .pair-slot .ah-btn {
+    flex: 1;
+    min-height: 44px;
+    border-radius: 12px;
+}
+
+.panel-actions.panel-row .ah-btn {
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: 10px;
+}
+
+/* Toast */
+#no-task-toast {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    color: #111827;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10000;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    animation: fadeInOut 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-20px) scale(0.95); }
+    10% { opacity: 1; transform: translateY(0) scale(1); }
+    90% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-20px) scale(0.95); }
+}
+
+/* Terminal Log */
+#answer-log {
+    height: 140px;
+    overflow-y: auto;
+    border: 1px solid #f3f4f6;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+    background: #f9fafb;
+    color: #4b5563;
+}
+
+#answer-log::-webkit-scrollbar {
+    width: 6px;
+}
+
+#answer-log::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#answer-log::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+    border-radius: 10px;
+}
+
+#answer-log::-webkit-scrollbar-thumb:hover {
+    background: #d1d5db;
+}
+
+.log-item {
+    margin: 4px 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #f3f4f6;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.success { color: #059669; border-left: 3px solid #10b981; }
+.error { color: #dc2626; border-left: 3px solid #ef4444; }
+.info { color: #374151; border-left: 3px solid #6b7280; }
+.debug { color: #6b7280; border-left: 3px solid #9ca3af; }
+
+/* Buttons */
+.ah-btn {
+    flex: 1;
+    padding: 8px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #374151;
+    background: #ffffff;
+}
+
+.ah-btn:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.ah-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.ah-primary {
+    background: #6366f1;
+    color: #ffffff;
+    border-color: #4f46e5;
+}
+
+.ah-primary:hover {
+    background: #4f46e5;
+    border-color: #4338ca;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.ah-danger {
+    background: #ffffff;
+    color: #ef4444;
+    border-color: #fee2e2;
+}
+
+.ah-danger:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
+
+.ah-secondary {
+    background: #f9fafb;
+    color: #4b5563;
+    border-color: #f3f4f6;
+}
+
+.ah-secondary:hover {
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+}
+
+.ah-success {
+    background: #10b981;
+    color: #ffffff;
+    border-color: #059669;
+}
+
+.ah-success:hover {
+    background: #059669;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Speed buttons */
+.speed-button {
+    transition: all 0.2s ease;
+    border-radius: 8px;
+}
+
+.speed-active {
+    background: #6366f1 !important;
+    color: #ffffff !important;
+    border-color: #4f46e5 !important;
+}
+
+#playback-speed-controls.segmented {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 6px;
+}
+
+#playback-speed-controls.segmented .ah-btn {
+    min-width: 60px;
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+/* Trial Badge */
+#answer-helper-panel .cx-trial-badge {
+    position: absolute;
+    left: 16px;
+    bottom: 12px;
+    color: #9ca3af;
+    font-size: 11px;
+}
+
+#answer-helper-panel .cx-trial-badge .trial-buy-btn {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 11px;
+    border: 1px solid #e0e7ff;
+    background: #eef2ff;
+    color: #4f46e5;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+#answer-helper-panel .cx-trial-badge .trial-buy-btn:hover {
+    background: #e0e7ff;
+    border-color: #c7d2fe;
+}

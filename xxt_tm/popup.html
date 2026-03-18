@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学习通题目提取器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 420px;
+      min-height: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .header .badge {
+      background: rgba(255,255,255,0.2);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+
+    .content {
+      padding: 16px;
+    }
+
+    .status-box {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .status-item:last-child {
+      border-bottom: none;
+    }
+
+    .status-label {
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    .status-value {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .status-value.success { color: #10b981; }
+    .status-value.warning { color: #f59e0b; }
+    .status-value.error { color: #ef4444; }
+
+    .btn {
+      width: 100%;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+
+    .btn-primary {
+      background: #6366f1;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4f46e5;
+    }
+
+    .btn-primary:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    .questions-list {
+      max-height: 300px;
+      overflow-y: auto;
+      background: white;
+      border-radius: 12px;
+      margin-top: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .question-item {
+      padding: 12px;
+      border-bottom: 1px solid #f1f5f9;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .question-item:hover {
+      background: #f8fafc;
+    }
+
+    .question-item:last-child {
+      border-bottom: none;
+    }
+
+    .question-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .question-type {
+      background: #e0e7ff;
+      color: #6366f1;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .question-id {
+      color: #94a3b8;
+      font-size: 11px;
+    }
+
+    .question-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #334155;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .options-list {
+      margin-top: 8px;
+      padding-left: 12px;
+    }
+
+    .option-item {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .copy-success {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #10b981;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      animation: fadeInOut 1.5s ease;
+    }
+
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 0; }
+      20%, 80% { opacity: 1; }
+    }
+
+    .detail-view {
+      background: white;
+      border-radius: 12px;
+      margin-top: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .detail-header {
+      background: #f8fafc;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .detail-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #64748b;
+      font-size: 20px;
+    }
+
+    .detail-content {
+      padding: 16px;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .detail-type {
+      display: inline-block;
+      background: #e0e7ff;
+      color: #6366f1;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .detail-question {
+      font-size: 14px;
+      line-height: 1.8;
+      color: #1e293b;
+      margin-bottom: 16px;
+    }
+
+    .detail-options {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .detail-option {
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .detail-option:last-child {
+      margin-bottom: 0;
+    }
+
+    .detail-option.correct {
+      background: #d1fae5;
+      color: #065f46;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M9 11l3 3L22 4"></path>
+      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+    </svg>
+    <h1>学习通题目提取器</h1>
+    <span class="badge">v1.0.0</span>
+  </div>
+
+  <div class="content">
+    <div class="status-box">
+      <div class="status-item">
+        <span class="status-label">页面状态</span>
+        <span class="status-value" id="pageStatus">检测中...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">检测到题目</span>
+        <span class="status-value" id="questionCount">0</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">字体加密</span>
+        <span class="status-value" id="fontStatus">-</span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="extractBtn">
+      <span id="btnText">提取题目</span>
+    </button>
+
+    <button class="btn btn-success" id="copyAllBtn" style="display: none;">
+      复制全部题目
+    </button>
+
+    <div id="questionsContainer"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
