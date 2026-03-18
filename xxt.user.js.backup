@@ -182,69 +182,46 @@ logger.info('System initialization completed');
 (function () {
   'use strict';
 
-  // ================= DeepSeek API 配置 =================
-  const DEEPSEEK_API_KEY_STORAGE = 'cx_deepseek_api_key';
-  const DEEPSEEK_API_BASE = 'https://api.deepseek.com';
+
+  (function () {
+    function _b64ToBytes(b64) { const bin = atob(b64); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+    function _bytesToStr(arr) { let s = ''; for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]); return s; }
+    function _strToBytes(s) { const out = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i); return out; }
+    function _xor(a, b) { const out = new Uint8Array(a.length); for (let i = 0; i < a.length; i++) out[i] = a[i] ^ b[i % b.length]; return out; }
+    const __S = [100, 121, 96, 105, 102, 109, 113, 102, 115, 96, 116, 98, 109, 117, 96, 51, 49, 51, 54].map(c => c - 1);
+    const __SALT = String.fromCharCode.apply(null, __S);
+    const __ENC = "idiM9YBNCEBSu80fAcWJtglB3UgCOQSNSUCG2EFbmlWW7AyIJkSb/kgNWgCHsoEA";
+    function __getDSK() {
+      try {
+        const step1 = __ENC.split('').reverse().join('');
+        const xored = _b64ToBytes(step1);
+        const plainB64Bytes = _xor(xored, _strToBytes(__SALT));
+        const plainB64 = _bytesToStr(plainB64Bytes);
+        return atob(plainB64);
+      } catch (e) { return ''; }
+    }
+    window.__getDeepseekKey = __getDSK;
+  })();
+
+
+  const DEEPSEEK_PROXY_BASE = 'https://api.116611.xyz';
+
   const DEEPSEEK_MODEL = 'deepseek-chat';
+  const DEEPSEEK_API_URL = `${DEEPSEEK_PROXY_BASE}/v1/chat/completions`;
 
-  // 获取用户配置的 API Key
-  function getDeepSeekApiKey() {
-    try {
-      return GM_getValue(DEEPSEEK_API_KEY_STORAGE, '');
-    } catch {
-      return localStorage.getItem(DEEPSEEK_API_KEY_STORAGE) || '';
-    }
-  }
-
-  // 保存 API Key
-  function saveDeepSeekApiKey(key) {
-    try {
-      GM_setValue(DEEPSEEK_API_KEY_STORAGE, key);
-      localStorage.setItem(DEEPSEEK_API_KEY_STORAGE, key);
-      return true;
-    } catch (e) {
-      console.error('保存 API Key 失败:', e);
-      return false;
-    }
-  }
-
-  // DeepSeek API 调用
   function deepseekChat(messages, options = {}) {
     return new Promise((resolve, reject) => {
-      const apiKey = getDeepSeekApiKey();
-      if (!apiKey) {
-        reject(new Error('请先配置 DeepSeek API Key'));
-        return;
-      }
-
-      // 打印 API 请求信息
-      console.log('═══════════════════════════════════════════');
-      console.log('🔵 DeepSeek API 请求信息:');
-      console.log('   API URL:', `${DEEPSEEK_API_BASE}/v1/chat/completions`);
-      console.log('   Model:', DEEPSEEK_MODEL);
-      console.log('   Messages:', messages.length);
-      console.log('   Options:', JSON.stringify(options));
-      console.log('   API Key:', apiKey.substring(0, 10) + '...');
-      console.log('═══════════════════════════════════════════');
-
       try {
         GM_xmlhttpRequest({
           method: 'POST',
-          url: `${DEEPSEEK_API_BASE}/v1/chat/completions`,
+          url: DEEPSEEK_API_URL,
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
+            'X-App-Token': __getDSAuth()
           },
           data: JSON.stringify({ model: DEEPSEEK_MODEL, messages, ...options }),
           timeout: 60000,
           onload: (r) => {
-            console.log('═══════════════════════════════════════════');
-            console.log('🟢 DeepSeek API 响应:');
-            console.log('   Status:', r.status);
-            console.log('   Status Text:', r.statusText);
-            console.log('   Response:', r.responseText.substring(0, 500) + '...');
-            console.log('═══════════════════════════════════════════');
-
             if (r.status >= 200 && r.status < 300) {
               try { resolve(JSON.parse(r.responseText)); } catch (e) { reject(e); }
             } else {
@@ -277,204 +254,258 @@ logger.info('System initialization completed');
   let lastEmptySectionKey = '';
   let recoveryTimerId = null;
 
-  // ================= 字体解密功能（来自 jm.user.js）=================
-  let fontHashParams = null;
-  let currentFontData = null;
-  let fontLoaded = false;
 
-  // 初始化解密表
-  function initDecryption() {
+  const API_BASE = 'https://116611.xyz';
+  const MONEY_YUAN = (() => {
     try {
-      const tableText = GM_getResourceText('Table');
-      if (tableText) {
-        fontHashParams = JSON.parse(tableText);
-        console.log('ChaoxingExtractor: 字体映射表加载成功, 条目数:', Object.keys(fontHashParams).length);
-      } else {
-        console.warn('ChaoxingExtractor: 字体映射表为空');
-      }
-    } catch (e) {
-      console.error('ChaoxingExtractor: 加载字体映射表失败', e);
+      const b64 = 'OC4wMA==';
+      return atob(b64);
+    } catch {
+      return '8.00';
     }
-  }
+  })();
+  const PAY_NAME = 'XHelper 解锁/赞助';
+  const DEFAULT_PAY = 'wxpay';
+  const LS_KEY_DEV_ID = 'cxhelper_device_id';
+  const LS_KEY_FREE = 'cxhelper_free_used';
+  const LS_KEY_LICENSED = 'cxhelper_licensed';
+  const POLL_MS_PAY = 3000;
+  const POLL_MAX_PAY = 100;
 
-  // 解析当前页面的加密字体
-  function parsePageFont() {
-    const styles = document.getElementsByTagName('style');
-    let fontBase64 = null;
 
-    for (let style of styles) {
-      const content = style.textContent;
-      if (content.includes('font-cxsecret') && content.includes('base64,')) {
-        const match = content.match(/base64,([\w\W]+?)'/);
-        if (match && match[1]) {
-          fontBase64 = match[1];
-          break;
-        }
-      }
-    }
-
-    if (fontBase64) {
+  const getFreeLimit = (() => {
+    let cached = null;
+    return function () {
+      if (cached != null) return cached;
       try {
-        const binary_string = window.atob(fontBase64);
-        const len = binary_string.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binary_string.charCodeAt(i);
-        }
-        const font = Typr.parse(bytes)[0];
-        currentFontData = font;
-        fontLoaded = true;
-        console.log('ChaoxingExtractor: 页面加密字体解析成功');
-      } catch (e) {
-        console.error('ChaoxingExtractor: 解析字体出错', e);
-        fontLoaded = false;
+
+        const b64 = 'JDEw';
+        const decoded = atob(b64);
+        const n = parseInt(decoded.replace(/\D/g, ''), 10);
+        cached = Number.isFinite(n) ? n : 10;
+      } catch {
+        cached = 10;
       }
-    } else {
-      fontLoaded = false;
-    }
-  }
-
-  // 获取MD5函数
-  function getMd5Fn() {
-    if (typeof md5 === 'function') return md5;
-    if (typeof Typr !== 'undefined' && typeof Typr.md5 === 'function') return Typr.md5;
-    if (window.md5) return window.md5;
-    return null;
-  }
-
-  // 解密文本
-  function decryptText(text) {
-    if (!text) return "";
-    if (!fontHashParams || !currentFontData) return text;
-
-    const md5Fn = getMd5Fn();
-    if (!md5Fn) {
-      console.warn('ChaoxingExtractor: 未找到MD5函数，无法解密');
-      return text;
-    }
-
-    let result = "";
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      const code = char.charCodeAt(0);
-      const glyphIndex = Typr.U.codeToGlyph(currentFontData, code);
-
-      if (glyphIndex > 0) {
-        const path = Typr.U.glyphToPath(currentFontData, glyphIndex);
-        if (path) {
-          const pathStr = JSON.stringify(path);
-          const hash = md5Fn(pathStr).slice(24);
-          let match = fontHashParams[hash];
-
-          if (match) {
-            if (typeof match === 'number') {
-              result += String.fromCharCode(match);
-            } else {
-              result += match;
-            }
-            continue;
-          }
-        }
-      }
-      result += char;
-    }
-    return result;
-  }
-
-  // ================= 移除付费功能，改为检查 API Key =================
-  async function ensureAccessAllowed() {
-    const apiKey = getDeepSeekApiKey();
-    if (!apiKey) {
-      showApiKeyConfigModal();
-      throw new Error('请先配置 DeepSeek API Key');
-    }
-    return true;
-  }
-
-  // 显示 API Key 配置弹窗
-  function showApiKeyConfigModal() {
-    const mask = document.createElement('div');
-    mask.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999998;backdrop-filter:blur(4px);';
-    const box = document.createElement('div');
-    box.style.cssText = 'position:fixed;left:50%;top:120px;transform:translateX(-50%);width:480px;background:#fff;border-radius:16px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;z-index:999999;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Arial;';
-
-    const currentKey = getDeepSeekApiKey();
-    box.innerHTML = `
-      <div style="padding:18px 24px;border-bottom:1px solid #f3f4f6;font-weight:700;font-size:16px;color:#111827;">配置 DeepSeek API Key</div>
-      <div style="padding:24px;">
-        <div style="margin-bottom:16px;font-size:14px;color:#4b5563;line-height:1.5;">
-          请输入您的 DeepSeek API Key 以使用自动答题功能。<br>
-          <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:#6366f1;text-decoration:none;">点击这里获取 API Key →</a>
-        </div>
-        <input type="text" id="cx_api_key_input" placeholder="sk-..." value="${currentKey}"
-          style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:monospace;margin-bottom:12px;">
-        <div style="font-size:12px;color:#9ca3af;line-height:1.5;">
-          💡 API Key 将安全保存在本地，不会上传到任何服务器
-        </div>
-      </div>
-      <div style="padding:16px 24px;background:#f9fafb;border-top:1px solid #f3f4f6;text-align:right;display:flex;justify-content:flex-end;gap:12px;">
-        <button id="cx_cancel_api" style="padding:10px 20px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;color:#4b5563;cursor:pointer;font-size:14px;font-weight:600;">取消</button>
-        <button id="cx_save_api" style="padding:10px 24px;border-radius:10px;border:none;background:#6366f1;color:#fff;cursor:pointer;font-size:14px;font-weight:600;">保存</button>
-      </div>
-    `;
-
-    document.body.appendChild(mask);
-    document.body.appendChild(box);
-
-    const input = box.querySelector('#cx_api_key_input');
-    const btnSave = box.querySelector('#cx_save_api');
-    const btnCancel = box.querySelector('#cx_cancel_api');
-
-    function close() { try { box.remove(); mask.remove(); } catch { } }
-
-    btnCancel.onclick = close;
-    btnSave.onclick = () => {
-      const key = input.value.trim();
-      if (!key) {
-        alert('请输入有效的 API Key');
-        return;
-      }
-      if (saveDeepSeekApiKey(key)) {
-        alert('API Key 保存成功！');
-        close();
-      } else {
-        alert('保存失败，请重试');
-      }
+      return cached;
     };
-    mask.onclick = close;
+  })();
+
+  function getDeviceIdPaid() {
+    try {
+      let id = localStorage.getItem(LS_KEY_DEV_ID);
+      if (!id) {
+        id = ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+        localStorage.setItem(LS_KEY_DEV_ID, id);
+      }
+      return id;
+    } catch { return 'dev_' + Math.random().toString(36).slice(2); }
+  }
+  const DEVICE_ID_PAID = getDeviceIdPaid();
+
+  function getCookie(key) {
+    try {
+      const name = key + '=';
+      const parts = document.cookie.split(';');
+      for (let part of parts) {
+        const s = part.trim();
+        if (s.indexOf(name) === 0) return decodeURIComponent(s.substring(name.length));
+      }
+      return '';
+    } catch { return ''; }
+  }
+  function setCookie(key, value, days, domain) {
+    try {
+      const d = new Date();
+      d.setTime(d.getTime() + ((days || 365) * 24 * 60 * 60 * 1000));
+      const expires = 'expires=' + d.toUTCString();
+      const dm = domain ? ';domain=' + domain : '';
+      document.cookie = key + '=' + encodeURIComponent(value) + ';path=/' + ';' + expires + dm;
+    } catch { }
+  }
+  function isLocallyLicensed() {
+    try {
+      // 优先从跨子域Cookie读取，保障不同页面一致
+      const c = getCookie(LS_KEY_LICENSED);
+      if (c === '1') return true;
+      return localStorage.getItem(LS_KEY_LICENSED) === '1';
+    } catch { return false; }
+  }
+  function setLocallyLicensed() {
+    try { localStorage.setItem(LS_KEY_LICENSED, '1'); } catch { }
+    // 写入跨子域Cookie，统一所有 *.chaoxing.com 页面状态
+    try { setCookie(LS_KEY_LICENSED, '1', 365, '.chaoxing.com'); } catch { }
+  }
+  function getFreeUsedCount() {
+    try { return parseInt(localStorage.getItem(LS_KEY_FREE) || '0', 10) || 0; } catch { return 0; }
+  }
+  function incFreeUsedCount() {
+    try { const n = getFreeUsedCount() + 1; localStorage.setItem(LS_KEY_FREE, String(n)); return n; } catch { return 0; }
+  }
+
+  async function checkLicensePaid() {
+    if (isLocallyLicensed()) return true;
+    try {
+      const r = await fetch(`${API_BASE}/api/license/status?deviceId=${encodeURIComponent(DEVICE_ID_PAID)}`, { credentials: 'omit' });
+      const ct = (r.headers.get('content-type') || '').toLowerCase();
+      const data = ct.includes('application/json') ? await r.json() : await r.text();
+      const ok = !!(data && data.licensed);
+      if (ok) setLocallyLicensed();
+      // try { updateTrialBadge(); } catch {}
+      return ok;
+    } catch { return false; }
+  }
+
+  async function startPaymentPaid(payType) {
+    const win = window.open('', '_blank');
+    try {
+      const resp = await fetch(`${API_BASE}/api/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: PAY_NAME,
+          money: MONEY_YUAN,
+          type: payType || DEFAULT_PAY,
+          param: DEVICE_ID_PAID
+        })
+      });
+      const html = await resp.text();
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      return true;
+    } catch (e) {
+      if (win) win.close();
+      alert('发起支付失败：' + e.message);
+      return false;
+    }
+  }
+
+  async function pollUntilLicensedPaid(onProgress) {
+    for (let i = 0; i < POLL_MAX_PAY; i++) {
+      if (onProgress) { try { onProgress(i); } catch { } }
+      const ok = await checkLicensePaid();
+      if (ok) { setLocallyLicensed(); return true; }
+      await new Promise(r => setTimeout(r, POLL_MS_PAY));
+    }
+    return false;
+  }
+
+  function showPayModalPaid(messageText) {
+    return new Promise(resolve => {
+      const mask = document.createElement('div');
+      mask.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999998;backdrop-filter:blur(4px);';
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;left:50%;top:120px;transform:translateX(-50%);width:420px;background:#fff;border-radius:16px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);overflow:hidden;z-index:999999;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Arial;';
+      const msg = messageText || '试用已用完，打赏8元永久解锁哦';
+      box.innerHTML = (
+        '<div style="padding:18px 24px;border-bottom:1px solid #f3f4f6;font-weight:700;font-size:16px;color:#111827;">解锁全部功能（永久）</div>' +
+        '<div style="padding:24px;">' +
+        '<div style="margin-bottom:16px;font-size:14px;color:#4b5563;line-height:1.5;">' + msg + '</div>' +
+        '<div style="margin-bottom:20px;background:#f9fafb;padding:16px;border-radius:12px;border:1px solid #f3f4f6;">' +
+        '<div style="display:flex;gap:20px;">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:500;color:#374151;"><input type="radio" name="cx_pay" value="wxpay" checked style="accent-color:#6366f1;"> 微信支付</label>' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:500;color:#374151;"><input type="radio" name="cx_pay" value="alipay" style="accent-color:#6366f1;"> 支付宝</label>' +
+        '</div>' +
+        '<div style="color:#9ca3af;font-size:12px;margin-top:10px;">若支付方式不可用请尝试切换</div>' +
+        '</div>' +
+        '<div id="cx_tip_paid" style="color:#6b7280;font-size:13px;line-height:1.5;padding:0 4px;">点击"去支付"将打开收银台，完成后此处会自动检测。</div>' +
+        '</div>' +
+        '<div style="padding:16px 24px;background:#f9fafb;border-top:1px solid #f3f4f6;text-align:right;display:flex;justify-content:flex-end;gap:12px;">' +
+        '<button id="cx_cancel_paid" style="padding:10px 20px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;color:#4b5563;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s;">取消</button>' +
+        '<button id="cx_go_pay" style="padding:10px 24px;border-radius:10px;border:none;background:#6366f1;color:#fff;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s;box-shadow:0 4px 6px -1px rgba(99, 102, 241, 0.2);">去支付</button>' +
+        '</div>'
+      );
+      document.body.appendChild(mask);
+      document.body.appendChild(box);
+
+      const tip = box.querySelector('#cx_tip_paid');
+      const btnPay = box.querySelector('#cx_go_pay');
+      const btnCancel = box.querySelector('#cx_cancel_paid');
+
+      function close() { try { box.remove(); mask.remove(); } catch { } }
+
+      btnCancel.onclick = () => { close(); resolve(false); };
+      btnPay.onclick = async () => {
+        btnPay.disabled = true;
+        btnPay.textContent = '打开收银台...';
+        const payType = (box.querySelector('input[name="cx_pay"]:checked') || {}).value || DEFAULT_PAY;
+        const ok = await startPaymentPaid(payType);
+        if (!ok) { btnPay.disabled = false; btnPay.textContent = '去支付'; return; }
+        btnPay.textContent = '检测支付中...';
+        if (tip) tip.innerHTML = '已打开收银台，请完成支付，完成后此处会自动解锁...<br><span style="color:#6366f1;font-size:12px;margin-top:4px;display:block;font-weight:600;">💡 若无法打开支付页面请尝试连接手机热点网络</span>';
+        const done = await pollUntilLicensedPaid();
+        if (done) {
+          if (tip) tip.textContent = '支付成功，正在解锁...';
+          setLocallyLicensed();
+          try { updateTrialBadge(); } catch { }
+          setTimeout(() => { close(); resolve(true); }, 500);
+        } else {
+          btnPay.disabled = false;
+          btnPay.textContent = '去支付';
+          if (tip) tip.textContent = '未检测到支付完成，可重试或稍后再次打开本面板。';
+        }
+      };
+    });
   }
 
   function showFeedbackModal() {
     const mask = document.createElement('div');
     mask.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999998;backdrop-filter:blur(4px);';
     const box = document.createElement('div');
-    box.style.cssText = 'position:fixed;left:50%;top:120px;transform:translateX(-50%);width:400px;background:#fff;border-radius:16px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;z-index:999999;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Arial;';
-    box.innerHTML = `
-      <div style="padding:18px 24px;border-bottom:1px solid #f3f4f6;font-weight:700;font-size:16px;color:#111827;">关于脚本</div>
-      <div style="padding:24px;text-align:center;">
-        <div style="margin-bottom:20px;font-size:14px;color:#4b5563;line-height:1.6;">
-          学习通自动刷课刷题（DeepSeek版）<br>
-          使用 DeepSeek API 进行智能答题<br>
-          支持题目提取、字体解密、自动答题
-        </div>
-        <div style="background:#f9fafb;border:1px solid #f3f4f6;border-radius:12px;padding:16px;margin:16px 0;">
-          <div style="font-size:13px;color:#6b7280;line-height:1.5;">
-            本脚本完全免费开源<br>
-            需要自行配置 DeepSeek API Key
-          </div>
-        </div>
-      </div>
-      <div style="padding:16px 24px;background:#f9fafb;border-top:1px solid #f3f4f6;text-align:right;">
-        <button id="feedback-close" style="padding:10px 24px;border-radius:10px;border:none;background:#6366f1;color:#fff;cursor:pointer;font-size:14px;font-weight:600;">关闭</button>
-      </div>
-    `;
+    box.style.cssText = 'position:fixed;left:50%;top:120px;transform:translateX(-50%);width:400px;background:#fff;border-radius:16px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);overflow:hidden;z-index:999999;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Arial;';
+    box.innerHTML = (
+      '<div style="padding:18px 24px;border-bottom:1px solid #f3f4f6;font-weight:700;font-size:16px;color:#111827;">意见反馈</div>' +
+      '<div style="padding:24px;text-align:center;">' +
+      '<div style="margin-bottom:20px;font-size:14px;color:#4b5563;line-height:1.6;">' +
+      '如果您在使用过程中遇到问题或有任何建议，欢迎通过以下方式联系我们：' +
+      '</div>' +
+      '<div style="background:#f9fafb;border:1px solid #f3f4f6;border-radius:12px;padding:20px;margin:16px 0;">' +
+      '<div style="font-size:13px;font-weight:600;color:#6366f1;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">联系邮箱</div>' +
+      '<div style="font-size:18px;font-weight:700;color:#111827;cursor:pointer;display:inline-block;padding:4px 8px;border-radius:6px;transition:background 0.2s;" onclick="navigator.clipboard.writeText(\'2036470448@qq.com\')" title="点击复制" onmouseover="this.style.background=\'#eef2ff\'" onmouseout="this.style.background=\'transparent\'">2036470448@qq.com</div>' +
+      '<div style="font-size:12px;color:#9ca3af;margin-top:8px;">点击邮箱地址即可复制</div>' +
+      '</div>' +
+      '<div style="font-size:13px;color:#6b7280;margin-top:16px;line-height:1.5;">我们将会认真对待每一条反馈，并且尽快回复您的问题。您的建议是我们改进产品的重要动力！</div>' +
+      '</div>' +
+      '<div style="padding:16px 24px;background:#f9fafb;border-top:1px solid #f3f4f6;text-align:right;">' +
+      '<button id="feedback-close" style="padding:10px 24px;border-radius:10px;border:none;background:#6366f1;color:#fff;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s;box-shadow:0 4px 6px -1px rgba(99, 102, 241, 0.2);">关闭</button>' +
+      '</div>'
+    );
     document.body.appendChild(mask);
     document.body.appendChild(box);
 
     const closeBtn = box.querySelector('#feedback-close');
-    function close() { try { box.remove(); mask.remove(); } catch { } }
+    function close() {
+      try {
+        box.remove();
+        mask.remove();
+      } catch { }
+    }
+
     closeBtn.onclick = close;
     mask.onclick = close;
+
+
+    const emailDiv = box.querySelector('[onclick*="clipboard"]');
+    if (emailDiv) {
+      emailDiv.addEventListener('click', function () {
+        const originalText = this.innerHTML;
+        this.innerHTML = '✅ 已复制到剪贴板';
+        this.style.color = '#2563eb';
+        setTimeout(() => {
+          this.innerHTML = originalText;
+          this.style.color = '#333';
+        }, 2000);
+      });
+    }
+  }
+
+  async function ensureAccessAllowed() {
+    if (await checkLicensePaid()) return true;
+    const used = getFreeUsedCount();
+    if (used < getFreeLimit()) { incFreeUsedCount(); try { updateTrialBadge(); } catch { } return true; }
+    const ok = await showPayModalPaid();
+    if (ok) { setLocallyLicensed(); try { updateTrialBadge(); } catch { } return true; }
+    throw new Error('试用已用完，请解锁后继续使用');
   }
 
   function getActivePanelRecord() {
@@ -750,6 +781,22 @@ logger.info('System initialization completed');
         .speed-active { background: #6366f1 !important; color: #ffffff !important; border-color: #4f46e5 !important; }
         #playback-speed-controls.segmented { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
         #playback-speed-controls.segmented .ah-btn { min-width: 60px; padding: 6px 8px; font-size: 12px; }
+
+        /* Trial Badge */
+        #answer-helper-panel .cx-trial-badge { position: absolute; left: 16px; bottom: 12px; color: #9ca3af; font-size: 11px; }
+        #answer-helper-panel .cx-trial-badge .trial-buy-btn {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 8px;
+            font-size: 11px;
+            border: 1px solid #e0e7ff;
+            background: #eef2ff;
+            color: #4f46e5;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        #answer-helper-panel .cx-trial-badge .trial-buy-btn:hover { background: #e0e7ff; border-color: #c7d2fe; }
     `);
 
 //创建界面
@@ -803,16 +850,12 @@ logger.info('System initialization completed');
                                 </button>
                             </div>
                         </div>
-                        <button id="copy-questions-btn" class="ah-btn ah-success">
-                            <span class="button-icon">📋</span>
-                            <span class="button-text">复制题目</span>
-                        </button>
-                        <button id="config-api-btn" class="ah-btn ah-secondary">
-                            <span class="button-icon">⚙️</span>
-                            <span class="button-text">配置API Key</span>
-                        </button>
                     </div>
                 </div>
+            </div>
+            <div id="cx_trial_badge" class="cx-trial-badge">
+                检测中...
+                <button id="buy-license" class="trial-buy-btn" style="display:none">购买授权</button>
             </div>
         `;
     document.body.appendChild(panel);
@@ -919,15 +962,6 @@ logger.info('System initialization completed');
       pauseStudyBtn.addEventListener('click', () => { stopStudyChapters(); });
     }
 
-    // 题目复制功能
-    document.getElementById('copy-questions-btn')?.addEventListener('click', () => {
-      copyQuestionsToClipboard();
-    });
-
-    // API Key 配置
-    document.getElementById('config-api-btn')?.addEventListener('click', () => {
-      showApiKeyConfigModal();
-    });
 
     document.getElementById('speed-1x')?.addEventListener('click', () => {
       setVideoPlaybackSpeed(1.0);
@@ -939,90 +973,23 @@ logger.info('System initialization completed');
       setVideoPlaybackSpeed(2.0);
     });
 
+
     updateSpeedButtonsState();
-    document.getElementById('feedback-btn')?.addEventListener('click', () => { showFeedbackModal(); });
-  }
 
-  // ================= 题目复制功能（来自 jm.user.js）=================
-  function extractQuestionsContent() {
-    parsePageFont(); // 刷新字体解析
-
-    const questions = document.querySelectorAll('.TiMu');
-    if (questions.length === 0) {
-      addLog('未找到题目，请确保在测验页面内', 'error');
-      return null;
-    }
-
-    let resultText = "";
-    questions.forEach((q, index) => {
-      // 提取题目标题
-      let titleDiv = q.querySelector('.Zy_TItle .clearfix') ||
-        q.querySelector('.Zy_TItle') ||
-        q.querySelector('.newZy_TItle') ||
-        q.querySelector('.fontLabel');
-
-      let titleText = titleDiv ? titleDiv.innerText.replace(/\s+/g, ' ').trim() : "未找到题目";
-      titleText = decryptText(titleText); // 解密
-
-      resultText += `【${index + 1}】 ${titleText}\n`;
-
-      // 提取选项
-      const options = q.querySelectorAll('ul li');
-      if (options.length > 0) {
-        options.forEach(opt => {
-          let optText = opt.innerText.replace(/\s+/g, ' ').trim();
-          optText = decryptText(optText); // 解密
-
-          const isChecked = opt.querySelector('input:checked') || opt.querySelector('.ri') || opt.querySelector('.dui');
-          const mark = isChecked ? " [已选]" : "";
-
-          resultText += `\t${optText}${mark}\n`;
-        });
-      }
-
-      // 提取答案/解析
-      const answerDiv = q.querySelector('.newAnswerBx') || q.querySelector('.answerBx') || q.querySelector('.lookAnswer');
-      if (answerDiv) {
-        let answerBlockText = answerDiv.innerText.replace(/\s+/g, ' ').trim();
-        answerBlockText = decryptText(answerBlockText); // 解密
-
-        if (answerBlockText) {
-          resultText += `\n${answerBlockText}\n`;
+    const buyBtn = document.getElementById('buy-license');
+    if (buyBtn) {
+      buyBtn.addEventListener('click', async () => {
+        try {
+          await showPayModalPaid('免费试用，打赏8元永久解锁哦');
+        } catch (e) {
+          addLog('打开支付弹窗失败: ' + (e && e.message ? e.message : e), 'error');
         }
-      }
-
-      resultText += "\n----------------------------------------\n\n";
-    });
-
-    return { text: resultText, count: questions.length };
-  }
-
-  function copyQuestionsToClipboard() {
-    try {
-      initDecryption(); // 初始化解密表
-      const data = extractQuestionsContent();
-
-      if (!data) {
-        addLog('未找到题目，请在测验页面使用此功能', 'error');
-        return;
-      }
-
-      GM_setClipboard(data.text);
-      addLog(`成功复制 ${data.count} 道题目到剪贴板！`, 'success');
-
-      // 显示提示
-      const toast = document.createElement('div');
-      toast.style.cssText = 'position:fixed;top:24px;right:24px;background:#10b981;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:500;z-index:10000;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);animation:fadeInOut 3s ease forwards;';
-      toast.textContent = `✅ 已复制 ${data.count} 道题目`;
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        try { toast.remove(); } catch {}
-      }, 3000);
-    } catch (e) {
-      addLog('复制题目失败: ' + e.message, 'error');
-      console.error('复制题目错误:', e);
+      });
     }
+    document.getElementById('feedback-btn')?.addEventListener('click', () => { showFeedbackModal(); });
+
+
+    setTimeout(updateTrialBadge, 0);
   }
 
 
@@ -1798,7 +1765,34 @@ decryptChaoXingFont().catch(console.error);
   }
 
 
-  // ================= 获取答案功能 =================
+  async function updateTrialBadge() {
+    try {
+      const el = document.getElementById('cx_trial_badge');
+      if (!el) return;
+      const licensed = await checkLicensePaid();
+
+      if (licensed) {
+        el.innerHTML = '永久激活，感谢赞助';
+        return;
+      }
+
+      const used = getFreeUsedCount();
+      const remain = Math.max(0, getFreeLimit() - used);
+      el.innerHTML = `试用剩余：${remain}/${getFreeLimit()} <button id="buy-license" class="trial-buy-btn">购买授权</button>`;
+
+      const btn = document.getElementById('buy-license');
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          try {
+            await showPayModalPaid('免费试用，打赏8元永久解锁哦');
+          } catch (e) {
+            addLog('打开支付弹窗失败: ' + (e && e.message ? e.message : e), 'error');
+          }
+        });
+      }
+    } catch { }
+  }
+
 
   function getQuestionInfo(questionElement) {
     try {
@@ -1975,257 +1969,118 @@ decryptChaoXingFont().catch(console.error);
 
 
   async function getAnswer(questionInfo) {
-    addLog('========== 开始获取答案 ==========', 'info');
-    addLog(`题目类型: ${questionInfo.type}`, 'info');
-    addLog(`题目内容: ${questionInfo.question}`, 'info');
-
-    if (questionInfo.options && questionInfo.options.length > 0) {
-      addLog(`选项数量: ${questionInfo.options.length}`, 'info');
-      questionInfo.options.forEach((opt, idx) => {
-        addLog(`选项${String.fromCharCode(65 + idx)}: ${opt}`, 'debug');
-      });
-    }
 
     try {
       await ensureAccessAllowed();
     } catch (e) {
-      addLog(`权限检查失败: ${String(e && e.message ? e.message : e)}`, 'error');
+      addLog(String(e && e.message ? e.message : e), 'error');
       return null;
     }
-
     const prompt = generatePrompt(questionInfo);
-    addLog('========== 发送到 DeepSeek 的提示词 ==========', 'info');
-    addLog(prompt, 'debug');
-    addLog('==========================================', 'info');
+    addLog(`发送到DeepSeek的提示词:\n${prompt}`, 'debug');
 
     try {
       const modelParams = getModelParams(questionInfo.type);
-      addLog(`模型参数: ${JSON.stringify(modelParams, null, 2)}`, 'debug');
-
-      addLog('正在调用 DeepSeek API...', 'info');
-      const startTime = Date.now();
+      addLog(`使用模型参数: ${JSON.stringify(modelParams)}`, 'debug');
 
       const data = await deepseekChat([
         { role: "user", content: prompt }
       ], modelParams);
-
-      const elapsed = Date.now() - startTime;
-      addLog(`API 调用耗时: ${elapsed}ms`, 'info');
-
-      // 显示完整的 API 响应
-      addLog('========== DeepSeek API 原始响应 ==========', 'info');
-      addLog(JSON.stringify(data, null, 2), 'debug');
-      addLog('==========================================', 'info');
-
       if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        addLog('API 响应格式错误: 缺少 choices 或 message', 'error');
         throw new Error('Invalid API response format');
       }
 
       const answer = data.choices[0].message.content.trim();
-      addLog('========== DeepSeek 返回的答案 ==========', 'success');
-      addLog(`原始答案: ${answer}`, 'success');
-      addLog('==========================================', 'success');
-
-      // 解析答案
-      const parsedAnswer = parseAnswer(answer, questionInfo.type);
-      addLog(`解析后的答案: ${parsedAnswer}`, 'info');
-
-      return parsedAnswer;
+      return answer;
     } catch (error) {
-      addLog(`========== API 调用失败 ==========`, 'error');
-      addLog(`错误类型: ${error.name}`, 'error');
-      addLog(`错误信息: ${error.message}`, 'error');
-      addLog(`错误堆栈: ${error.stack}`, 'debug');
-      addLog('====================================', 'error');
+      addLog(`API调用失败: ${error.message}`, 'error');
       return null;
     }
   }
 
-  // 解析 DeepSeek 返回的答案
-  function parseAnswer(rawAnswer, questionType) {
-    addLog(`开始解析答案，题目类型: ${questionType}`, 'debug');
-    addLog(`原始答案: "${rawAnswer}"`, 'debug');
-
-    let parsed = rawAnswer.trim();
-
-    // 针对不同题型进行解析
-    switch (questionType) {
-      case 'single':
-      case 'judge':
-        // 单选题和判断题：提取单个字母
-        const singleMatch = parsed.match(/[A-Z]/i);
-        if (singleMatch) {
-          parsed = singleMatch[0].toUpperCase();
-          addLog(`提取到单选答案: ${parsed}`, 'debug');
-        }
-        break;
-
-      case 'multiple':
-        // 多选题：提取所有字母
-        const letters = parsed.match(/[A-Z]/gi);
-        if (letters && letters.length > 0) {
-          parsed = letters.map(l => l.toUpperCase()).join(',');
-          addLog(`提取到多选答案: ${parsed}`, 'debug');
-        }
-        break;
-
-      case 'blank':
-      case 'cloze':
-        // 填空题：保持原样或按逗号分隔
-        addLog(`填空题答案: ${parsed}`, 'debug');
-        break;
-
-      default:
-        // 其他题型：保持原样
-        addLog(`其他题型，保持原答案: ${parsed}`, 'debug');
-    }
-
-    return parsed;
-  }
-
 
   function generatePrompt(questionInfo) {
-    addLog('========== 生成提示词 ==========', 'debug');
+    let prompt = `直接给出答案不要解释 \n题目：${questionInfo.question}\n`;
 
-    let prompt = '';
-
-    // 根据题目类型生成不同的提示词，要求返回 JSON 格式
-    if (questionInfo.type === 'single') {
-      // 单选题
-      prompt = `你是一个专业的答题助手。请分析以下单选题并给出答案。
-
-题目：${questionInfo.question}\n\n`;
-
+    if (questionInfo.type === 'single' || questionInfo.type === 'multiple' || questionInfo.type === 'judge') {
       if (questionInfo.options && questionInfo.options.length > 0) {
         prompt += '选项：\n';
         questionInfo.options.forEach((option, index) => {
           const letter = String.fromCharCode(65 + index);
+
           const cleanOption = option.replace(/^[A-Z][\s.、．。]+|^\d+[\s.、．。]+/, '').trim();
           prompt += `${letter}. ${cleanOption}\n`;
         });
+
+
+        if (questionInfo.type === 'single') {
+          prompt += '\n请直接回答选项字母（A/B/C/D/...）';
+        } else if (questionInfo.type === 'multiple') {
+          prompt += '\n这是多选题，请列出所有正确选项的字母，用逗号分隔（如：A,B,D）';
+        } else if (questionInfo.type === 'judge') {
+          prompt += '\n这是判断题，请回答A表示正确，B表示错误';
+        }
       }
+    } else if (questionInfo.type === 'blank') {
 
-      prompt += `
-请严格按照以下 JSON 格式返回答案，不要返回任何其他内容：
-[{"answer": "答案字母"}]
-
-示例：对于单选题，如果答案是 A，则返回：
-[{"answer": "A"}]`;
-
-    } else if (questionInfo.type === 'multiple') {
-      // 多选题
-      prompt = `你是一个专业的答题助手。请分析以下多选题并给出所有正确答案。
-
-题目：${questionInfo.question}\n\n`;
-
-      if (questionInfo.options && questionInfo.options.length > 0) {
-        prompt += '选项：\n';
-        questionInfo.options.forEach((option, index) => {
-          const letter = String.fromCharCode(65 + index);
-          const cleanOption = option.replace(/^[A-Z][\s.、．。]+|^\d+[\s.、．。]+/, '').trim();
-          prompt += `${letter}. ${cleanOption}\n`;
-        });
-      }
-
-      prompt += `
-请严格按照以下 JSON 格式返回答案，不要返回任何其他内容：
-[{"answer": ["答案字母1", "答案字母2", ...]}]
-
-示例：如果正确答案是 A、B、D，则返回：
-[{"answer": ["A", "B", "D"]}]`;
-
-    } else if (questionInfo.type === 'judge') {
-      // 判断题
-      prompt = `你是一个专业的答题助手。请判断以下说法的正确性。
-
-题目：${questionInfo.question}
-
-选项：A. 正确  B. 错误
-
-请严格按照以下 JSON 格式返回答案，不要返回任何其他内容：
-[{"answer": "A"}]  // A表示正确，B表示错误
-
-示例：如果答案是"正确"，则返回：
-[{"answer": "A"}]`;
-
-    } else if (questionInfo.type === 'blank' || questionInfo.type === 'cloze') {
-      // 填空题
-      prompt = `你是一个专业的答题助手。请回答以下填空题。
-
-题目：${questionInfo.question}
-
-请严格按照以下 JSON 格式返回答案，不要返回任何其他内容：
-[{"answer": ["答案1", "答案2", ...]}]
-
-示例：如果有两个空，答案是"北京"和"上海"，则返回：
-[{"answer": ["北京", "上海"]}]
-
-注意：答案按题目中空的顺序依次填写。`;
-
-    } else {
-      // 其他题型（简答题、论述题等）
-      prompt = `你是一个专业的答题助手。请简洁地回答以下问题。
-
-题目：${questionInfo.question}\n\n`;
-
-      if (questionInfo.options && questionInfo.options.length > 0) {
-        prompt += '选项：\n';
-        questionInfo.options.forEach((option, index) => {
-          const letter = String.fromCharCode(65 + index);
-          const cleanOption = option.replace(/^[A-Z][\s.、．。]+|^\d+[\s.、．。]+/, '').trim();
-          prompt += `${letter}. ${cleanOption}\n`;
-        });
-      }
-
-      prompt += `
-请严格按照以下 JSON 格式返回答案，不要返回任何其他内容：
-[{"answer": "你的答案"}]`;
+      prompt += '\n这是填空题，请按顺序给出每个空的答案，用逗号分隔';
     }
 
-    addLog(`生成的提示词长度: ${prompt.length} 字符`, 'debug');
     return prompt;
   }
 
 
 
-  function fillAnswer(answer, questionElement, type) {
-    addLog('========== 开始填写答案 ==========', 'info');
-    addLog(`题目类型: ${type}`, 'info');
-    addLog(`答案内容: ${answer}`, 'info');
-    addLog(`题目元素ID: ${questionElement.id}`, 'debug');
-    addLog(`题目元素类名: ${questionElement.className}`, 'debug');
+  (function () {
+    function __getDSAuth() {
+      const k = 71;
+      const arr = [41, 46, 42, 38, 52, 46, 54, 50, 38, 41, 45, 46, 38];
+      return String.fromCharCode(...arr.map(n => n ^ k));
+    }
+    window.__getDSAuth = __getDSAuth;
+  })();
 
+  function fillAnswer(answer, questionElement, type) {
     try {
+      addLog(`开始填写答案: ${type}类型`, 'debug');
+      addLog('题目元素类名: ' + questionElement.className, 'debug');
       let filled = false;
+
       const questionId = questionElement.id;
+      addLog(`处理题目ID: ${questionId}`, 'debug');
 
       switch (type) {
         case 'blank':
         case 'cloze': {
-          addLog('处理填空题...', 'info');
+
           const answers = answer.split(/[,，;；、]\s*/).map(a => a.trim()).filter(a => a);
-          addLog(`解析到 ${answers.length} 个答案`, 'info');
-          answers.forEach((ans, idx) => addLog(`  答案${idx + 1}: ${ans}`, 'debug'));
+          addLog(`解析到的答案数量: ${answers.length}`, 'debug');
+          answers.forEach((ans, idx) => addLog(`第${idx + 1}个答案: ${ans}`, 'debug'));
+
 
           const editorElements = questionElement.querySelectorAll('[id^="answerEditor"]');
-          addLog(`找到 ${editorElements.length} 个编辑器元素`, 'info');
-
           if (editorElements.length > 0) {
+            addLog(`找到UEditor元素数量: ${editorElements.length}`, 'debug');
+
             editorElements.forEach((editorElement, index) => {
               const editorId = editorElement.id;
-              addLog(`处理编辑器 ${index + 1}/${editorElements.length}: ${editorId}`, 'debug');
+              addLog(`处理第${index + 1}个编辑器: ${editorId}`, 'debug');
+
 
               if (index < answers.length) {
                 const currentAnswer = answers[index];
                 try {
+
                   if (typeof UE !== 'undefined' && UE.getEditor) {
                     const editor = UE.getEditor(editorId);
                     if (editor) {
+
                       if (editor.ready) {
                         editor.ready(() => {
                           editor.setContent(currentAnswer);
-                          addLog(`✓ 成功设置编辑器内容: ${currentAnswer}`, 'success');
+                          addLog(`通过UEditor API设置第${index + 1}个空的内容: ${currentAnswer}`, 'debug');
+
+
                           if (typeof editor.fireEvent === 'function') {
                             editor.fireEvent('contentChange');
                           }
@@ -2234,6 +2089,7 @@ decryptChaoXingFont().catch(console.error);
                       }
                     }
                   }
+
 
                   if (!filled) {
                     const iframeSelector = `iframe[id^="ueditor_"]`;
@@ -2374,35 +2230,14 @@ decryptChaoXingFont().catch(console.error);
         case 'single':
         case 'multiple':
         case 'judge': {
-          addLog(`处理${type === 'single' ? '单选题' : type === 'multiple' ? '多选题' : '判断题'}...`, 'info');
-
-          // 解析答案
-          let answerLetters = [];
-          const upperAnswer = answer.toUpperCase().trim();
-
+          let answerLetters;
           if (type === 'multiple') {
-            // 多选题：用逗号、空格、中文逗号分割
-            answerLetters = upperAnswer.split(/[,，、\s]+/).filter(l => l.trim());
+            answerLetters = answer.toUpperCase().split(/[,，、\s]+/).map(l => l.trim());
           } else {
-            // 单选和判断：取第一个字母
-            const match = upperAnswer.match(/[A-Z]/);
-            if (match) {
-              answerLetters = [match[0]];
-            }
+            answerLetters = [answer.toUpperCase().trim()];
           }
 
-          addLog(`========== 答案解析结果 ==========`, 'info');
-          addLog(`原始答案: ${answer}`, 'info');
-          addLog(`解析后的选项字母: ${answerLetters.join(', ')}`, 'info');
-          addLog(`=================================`, 'info');
-
-          if (answerLetters.length === 0) {
-            addLog(`❌ 无法解析答案选项`, 'error');
-            break;
-          }
-
-          let foundCount = 0;
-          let clickCount = 0;
+          addLog(`识别到的选项字母: ${answerLetters.join(', ')}`, 'debug');
 
           for (const letter of answerLetters) {
             if (!/^[A-Z]$/.test(letter)) {
@@ -2410,89 +2245,37 @@ decryptChaoXingFont().catch(console.error);
               continue;
             }
 
-            addLog(`正在查找并点击选项 ${letter}...`, 'info');
-
-            // 尝试多种选择器方式查找选项
-            const optionSelectors = [
-              // 方式1: 直接通过父级查找
-              `#${questionId} > div.stem_answer > div:nth-child(${letter.charCodeAt(0) - 65 + 1})`,
-              // 方式2: 通过选项文本查找 (包含字母的div)
-              `div:contains("${letter}.")`,
-              // 方式3: 学习通标准结构
-              `.stem_answer > div:nth-child(${letter.charCodeAt(0) - 65 + 1})`,
-              // 方式4: 查找包含选项内容的元素
-              `[class*="option"]:nth-child(${letter.charCodeAt(0) - 65 + 1})`,
-            ];
-
-            let optionElement = null;
-            for (const selector of optionSelectors) {
-              try {
-                optionElement = document.querySelector(selector);
-                if (optionElement) {
-                  addLog(`尝试选择器 ${selector} 找到元素`, 'debug');
-                  break;
-                }
-              } catch (e) {
-                // 忽略无效选择器
-              }
-            }
-
-            // 如果上面没找到，尝试查找所有选项元素
-            if (!optionElement) {
-              const allOptions = questionElement.querySelectorAll('.stem_answer > div, [class*="option"]');
-              const idx = letter.charCodeAt(0) - 65;
-              if (idx >= 0 && idx < allOptions.length) {
-                optionElement = allOptions[idx];
-                addLog(`通过索引 ${idx} 找到选项元素`, 'debug');
-              }
-            }
+            const index = letter.charCodeAt(0) - 65 + 1; // 1-based index for nth-child
+            const specificSelector = `#${questionId} > div.stem_answer > div:nth-child(${index})`;
+            const optionElement = document.querySelector(specificSelector);
 
             if (optionElement) {
               try {
-                // 点击选项
                 optionElement.click();
-                clickCount++;
-                addLog(`✓ 点击选项 ${letter} 成功`, 'success');
+                addLog(`点击选项元素: ${specificSelector}`, 'debug');
 
-                // 尝试找到并点击 input
-                const input = optionElement.querySelector('input[type="radio"], input[type="checkbox"]');
+                const input = optionElement.querySelector('input');
                 if (input) {
-                  if (!input.checked) {
-                    input.click();
-                    input.checked = true;
-                  }
+                  input.click();
+                  input.checked = true;
                   input.dispatchEvent(new Event('change', { bubbles: true }));
-                  addLog(`✓ 设置 input 选中状态`, 'debug');
+                  addLog(`点击选项input元素`, 'debug');
                 }
 
-                // 尝试点击 label
                 const label = optionElement.querySelector('label');
                 if (label) {
                   label.click();
-                  addLog(`✓ 点击 label`, 'debug');
+                  addLog(`点击选项label元素`, 'debug');
                 }
 
-                foundCount++;
                 filled = true;
               } catch (e) {
-                addLog(`❌ 点击选项 ${letter} 失败: ${e.message}`, 'error');
+                addLog(`点击选项 ${letter} 失败: ${e.message}`, 'error');
               }
             } else {
-              addLog(`❌ 未找到选项 ${letter} 对应的元素`, 'error');
-
-              // 打印页面中所有选项供调试
-              const allOptions = questionElement.querySelectorAll('.stem_answer > div, li, [class*="option"]');
-              addLog(`页面中共有 ${allOptions.length} 个选项元素`, 'debug');
-              allOptions.forEach((opt, idx) => {
-                addLog(`  选项${idx}: ${opt.className} - ${opt.innerText.substring(0, 30)}`, 'debug');
-              });
+              addLog(`未找到选项元素: ${specificSelector}`, 'error');
             }
           }
-
-          addLog(`========== 填写结果 ==========`, 'info');
-          addLog(`尝试点击: ${clickCount} 个选项`, 'info');
-          addLog(`成功填写: ${foundCount} 个选项`, 'info');
-          addLog(`=============================`, 'info');
           break;
         }
         default:
@@ -2764,25 +2547,13 @@ decryptChaoXingFont().catch(console.error);
 
     isAnswering = true;
     updateStatus(true);
-    addLog('═══════════════════════════════════════════', 'info');
-    addLog('🚀 开始自动答题', 'info');
-    addLog('═══════════════════════════════════════════', 'info');
+    addLog('开始查找题目...', 'debug');
 
     try {
 
-      addLog('当前页面URL: ' + window.location.href, 'info');
-      addLog('当前页面标题: ' + document.title, 'info');
+      addLog('当前页面URL: ' + window.location.href, 'debug');
+      addLog('当前页面标题: ' + document.title, 'debug');
 
-      // 检查 API Key 是否已配置
-      const apiKey = getDeepSeekApiKey();
-      if (!apiKey) {
-        addLog('⚠️ 尚未配置 DeepSeek API Key', 'error');
-        addLog('请点击"配置API Key"按钮设置您的 API Key', 'error');
-        isAnswering = false;
-        updateStatus(false);
-        return;
-      }
-      addLog('✓ DeepSeek API Key 已配置', 'success');
 
       // 优先使用学习通标准选择器（参考 jm.user.js 的成功经验）
       const possibleSelectors = [
@@ -2808,14 +2579,14 @@ decryptChaoXingFont().catch(console.error);
         questions = document.querySelectorAll(selector);
         if (questions.length > 0) {
           foundSelector = selector;
-          addLog(`✓ 使用选择器 "${selector}" 找到 ${questions.length} 个题目`, 'success');
+          addLog(`使用选择器 ${selector} 找到 ${questions.length} 个题目`, 'debug');
           break;
         }
       }
 
 
       if (questions.length === 0) {
-        addLog('使用常规选择器未找到题目，尝试查找可能的题目容器...', 'warn');
+        addLog('使用常规选择器未找到题目，尝试查找可能的题目容器...', 'debug');
 
 
         const allElements = document.querySelectorAll('*');
@@ -2833,87 +2604,56 @@ decryptChaoXingFont().catch(console.error);
 
         if (possibleQuestions.length > 0) {
           questions = possibleQuestions;
-          addLog(`通过内容分析找到 ${questions.length} 个可能的题目`, 'info');
+          addLog(`通过内容分析找到 ${questions.length} 个可能的题目`, 'debug');
         }
       }
 
       if (questions.length === 0) {
-        addLog('❌ 未找到任何题目，请确保页面已完全加载', 'error');
-        addLog('提示：确保当前页面是测验或考试页面', 'info');
-        isAnswering = false;
-        updateStatus(false);
+        addLog('未找到任何题目，请确保页面已完全加载', 'error');
+
+        addLog('页面主要内容：' + document.body.innerHTML.substring(0, 500) + '...', 'debug');
         return;
       }
 
 
-      addLog('═══════════════════════════════════════════', 'info');
-      addLog(`📋 共找到 ${questions.length} 个题目，准备开始答题`, 'info');
-      addLog('═══════════════════════════════════════════', 'info');
-
+      addLog(`共找到 ${questions.length} 个题目`, 'info');
+      addLog('正在初始化中...', 'info');
       Array.from(questions).forEach((q, idx) => {
-        addLog(`  题目 ${idx + 1}: ${q.className} | ID: ${q.id}`, 'debug');
+        addLog(`题目 ${idx + 1} 类名: ${q.className}, ID: ${q.id}`, 'debug');
       });
 
-      let successCount = 0;
-      let failCount = 0;
-
-      for (let i = 0; i < questions.length; i++) {
-        const question = questions[i];
+      for (let question of questions) {
         if (!isAnswering) {
-          addLog('⏸️ 自动答题已暂停', 'info');
+          addLog('自动答题已暂停', 'info');
           break;
         }
 
-        addLog('───────────────────────────────────────────', 'info');
-        addLog(`📝 正在处理第 ${i + 1}/${questions.length} 题`, 'info');
-
         const questionInfo = getQuestionInfo(question);
-        if (!questionInfo || !questionInfo.question) {
-          addLog(`❌ 题目信息获取失败，跳过`, 'error');
-          failCount++;
+        if (!questionInfo) {
+          addLog('题目信息获取失败，跳过当前题目', 'error');
           continue;
         }
 
-        addLog(`题目内容: ${questionInfo.question.substring(0, 50)}...`, 'info');
-        addLog(`题目类型: ${questionInfo.type}`, 'info');
-        if (questionInfo.options && questionInfo.options.length > 0) {
-          addLog(`选项数量: ${questionInfo.options.length}`, 'info');
-        }
+        addLog(`正在处理题目: ${questionInfo.question.substring(0, 30)}...`);
+        addLog(`题目类型: ${questionInfo.type}`, 'debug');
+        addLog(`选项数量: ${questionInfo.options.length}`, 'debug');
 
-        // 调用 DeepSeek API 获取答案
-        addLog('🤖 正在调用 DeepSeek API 获取答案...', 'info');
         const answer = await getAnswer(questionInfo);
-
         if (answer) {
-          addLog(`✅ DeepSeek 返回答案: ${answer}`, 'success');
-          addLog('📝 正在填写答案...', 'info');
+          addLog(`获取到答案: ${answer}`);
           fillAnswer(answer, question, questionInfo.type);
-          successCount++;
-        } else {
-          addLog(`❌ 获取答案失败`, 'error');
-          failCount++;
         }
-
-        // 显示进度
-        addLog(`📊 进度: ${successCount} 成功, ${failCount} 失败`, 'info');
-        addLog('───────────────────────────────────────────', 'info');
 
         if (isAnswering) {
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
-
-      addLog('═══════════════════════════════════════════', 'info');
-      addLog(`🎉 答题完成！`, 'success');
-      addLog(`   成功: ${successCount} 题`, 'success');
-      addLog(`   失败: ${failCount} 题`, 'info');
-      addLog('═══════════════════════════════════════════', 'info');
     } catch (error) {
-      addLog(`❌ 自动答题过程出错: ${error.message}`, 'error');
-      addLog(`错误堆栈: ${error.stack}`, 'debug');
+      addLog(`自动答题过程出错: ${error.message}`, 'error');
     } finally {
       isAnswering = false;
       updateStatus(false);
+      addLog('答题过程结束', 'success');
     }
   }
 
