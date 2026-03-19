@@ -217,15 +217,15 @@ logger.info('System initialization completed');
         return;
       }
 
-      // 打印 API 请求信息
-      console.log('═══════════════════════════════════════════');
-      console.log('🔵 DeepSeek API 请求信息:');
-      console.log('   API URL:', `${DEEPSEEK_API_BASE}/v1/chat/completions`);
-      console.log('   Model:', DEEPSEEK_MODEL);
-      console.log('   Messages:', messages.length);
-      console.log('   Options:', JSON.stringify(options));
-      console.log('   API Key:', apiKey.substring(0, 10) + '...');
-      console.log('═══════════════════════════════════════════');
+      // // 打印 API 请求信息
+      // console.log('═══════════════════════════════════════════');
+      // console.log('🔵 DeepSeek API 请求信息:');
+      // console.log('   API URL:', `${DEEPSEEK_API_BASE}/v1/chat/completions`);
+      // console.log('   Model:', DEEPSEEK_MODEL);
+      // console.log('   Messages:', messages.length);
+      // console.log('   Options:', JSON.stringify(options));
+      // console.log('   API Key:', apiKey.substring(0, 10) + '...');
+      // console.log('═══════════════════════════════════════════');
 
       try {
         GM_xmlhttpRequest({
@@ -238,12 +238,12 @@ logger.info('System initialization completed');
           data: JSON.stringify({ model: DEEPSEEK_MODEL, messages, ...options }),
           timeout: 60000,
           onload: (r) => {
-            console.log('═══════════════════════════════════════════');
-            console.log('🟢 DeepSeek API 响应:');
-            console.log('   Status:', r.status);
-            console.log('   Status Text:', r.statusText);
-            console.log('   Response:', r.responseText.substring(0, 500) + '...');
-            console.log('═══════════════════════════════════════════');
+            // console.log('═══════════════════════════════════════════');
+            // console.log('🟢 DeepSeek API 响应:');
+            // console.log('   Status:', r.status);
+            // console.log('   Status Text:', r.statusText);
+            // console.log('   Response:', r.responseText.substring(0, 500) + '...');
+            // console.log('═══════════════════════════════════════════');
 
             if (r.status >= 200 && r.status < 300) {
               try { resolve(JSON.parse(r.responseText)); } catch (e) { reject(e); }
@@ -288,12 +288,12 @@ logger.info('System initialization completed');
       const tableText = GM_getResourceText('Table');
       if (tableText) {
         fontHashParams = JSON.parse(tableText);
-        console.log('ChaoxingExtractor: 字体映射表加载成功, 条目数:', Object.keys(fontHashParams).length);
+        //console.log('ChaoxingExtractor: 字体映射表加载成功, 条目数:', Object.keys(fontHashParams).length);
       } else {
-        console.warn('ChaoxingExtractor: 字体映射表为空');
+        //console.warn('ChaoxingExtractor: 字体映射表为空');
       }
     } catch (e) {
-      console.error('ChaoxingExtractor: 加载字体映射表失败', e);
+      //console.error('ChaoxingExtractor: 加载字体映射表失败', e);
     }
   }
 
@@ -324,9 +324,9 @@ logger.info('System initialization completed');
         const font = Typr.parse(bytes)[0];
         currentFontData = font;
         fontLoaded = true;
-        console.log('ChaoxingExtractor: 页面加密字体解析成功');
+       // console.log('ChaoxingExtractor: 页面加密字体解析成功');
       } catch (e) {
-        console.error('ChaoxingExtractor: 解析字体出错', e);
+       // console.error('ChaoxingExtractor: 解析字体出错', e);
         fontLoaded = false;
       }
     } else {
@@ -959,7 +959,7 @@ logger.info('System initialization completed');
     document.getElementById('feedback-btn')?.addEventListener('click', () => { showFeedbackModal(); });
   }
 
-  // ================= 题目复制功能（来自 jm.user.js）=================
+
   function extractQuestionsContent() {
     parsePageFont(); // 刷新字体解析
 
@@ -1013,7 +1013,23 @@ logger.info('System initialization completed');
     return { text: resultText, count: questions.length };
   }
 
-  // ================= 随机答题功能 =================
+  /// 获取题目内容
+  function getQuestionsContent() {
+    try {
+      initDecryption(); // 初始化解密表
+      const data = extractQuestionsContent();
+
+      if (!data) {
+        return null;
+      }
+
+      return data.text;
+    } catch (e) {
+      console.error('获取题目失败:', e);
+      return null;
+    }
+  }
+  
 
   let isRandomAnswering = false;
 
@@ -1684,51 +1700,188 @@ decryptChaoXingFont().catch(console.error);
     try {
       if (!isStudyingChapters) return false;
 
+      // 如果是测验页面，使用专门的测验答题函数
       if (isQuizPageDoc(rootDoc)) {
         if (!isStudyingChapters) return false;
         const ok = await autoAnswerQuizInDocument(rootDoc);
         if (ok) return true;
       }
 
-      // 优先使用学习通标准选择器 .TiMu（参考 jm.user.js）
-      const possibleSelectors = [
-        '.TiMu',                    // 学习通标准题目类名（最优先）
-        '.questionLi',              // 常见题目列表项
-        '.question',                // 通用题目类
-        '.subject_item',            // 科目项
-        '.examPaper_subject',       // 试卷题目
-        '.questionContainer',       // 题目容器
-        '.q-item',                  // 题目项
-        '.subject_node',            // 科目节点
-        '.ti-item',                 // 题项
-        '.exam-item',               // 考试项
-        '[class*="question"]',      // 包含question的类名
-        '[class*="subject"]',       // 包含subject的类名
-        '[class*="TiMu"]',          // 包含TiMu的类名
-        '[class*="timu"]'           // 包含timu的类名（小写）
-      ];
-      let questions = [];
-      for (let selector of possibleSelectors) {
-        questions = rootDoc.querySelectorAll(selector);
-        if (questions.length > 0) {
-          addLog(`使用选择器 "${selector}" 找到 ${questions.length} 个题目`, 'debug');
-          break;
-        }
-      }
+      // 使用 .TiMu 选择器获取题目（与随机答题一致）
+      const questions = rootDoc.querySelectorAll('.TiMu');
       if (questions.length === 0) return false;
       addLog(`章节内发现 ${questions.length} 个题目，自动作答...`, 'info');
-      for (let q of questions) {
+
+      // 刷新字体解析
+      parsePageFont();
+
+      // 收集所有题目信息
+      const allQuestionsInfo = [];
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
         if (!isStudyingChapters) { addLog('已暂停刷章节，停止小测作答', 'info'); return false; }
-        const info = getQuestionInfo(q);
-        if (!info || !info.question) continue;
-        const ans = await getAnswer(info);
-        if (ans) {
-          fillAnswer(ans, q, info.type);
-          await new Promise(r => setTimeout(r, 800));
+
+        // 获取题目类型
+        const questionType = q.getAttribute('data') || q.querySelector('.newTiMu')?.getAttribute('data') || '0';
+        let type = 'single';
+        if (questionType === '1') type = 'multiple';
+        else if (questionType === '3') type = 'judge';
+        else if (questionType === '2') type = 'blank';
+
+        // 获取解密后的选项
+        const options = [];
+        const optionLis = q.querySelectorAll('ul li');
+        optionLis.forEach(opt => {
+          let optText = opt.innerText.replace(/\s+/g, ' ').trim();
+          optText = decryptText(optText);
+          options.push(optText);
+        });
+
+        // 获取解密后的题目
+        let titleDiv = q.querySelector('.Zy_TItle .clearfix') ||
+          q.querySelector('.Zy_TItle') ||
+          q.querySelector('.newZy_TItle') ||
+          q.querySelector('.fontLabel');
+        let questionText = titleDiv ? titleDiv.innerText.replace(/\s+/g, ' ').trim() : "未找到题目";
+        questionText = decryptText(questionText);
+
+        if (questionText && questionText !== "未找到题目") {
+          allQuestionsInfo.push({
+            index: i,
+            element: q,
+            info: {
+              type: type,
+              question: questionText,
+              options: options
+            }
+          });
         }
       }
-      return true;
+
+      if (allQuestionsInfo.length === 0) {
+        addLog('无法解析题目信息', 'error');
+        return false;
+      }
+
+      addLog(`成功收集 ${allQuestionsInfo.length} 道题目，调用 AI 批量答题...`, 'info');
+
+      // 一次性发送所有题目给 AI
+      const data1 = await getQuestionsContent()
+      console.log(data1)
+      const batchPrompt = generateBatchPrompt(data1);
+
+      try {
+        await ensureAccessAllowed();
+
+        const modelParams = {
+          temperature: 0.1,
+          max_tokens: 4000,
+          top_p: 0.1,
+          frequency_penalty: 0.1,
+          presence_penalty: 0.1
+        };
+
+        const data = await deepseekChat([
+          { role: "user", content: batchPrompt }
+        ], modelParams);
+
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+          throw new Error('API 响应格式错误');
+        }
+
+        const rawAnswer = data.choices[0].message.content.trim();
+        const allAnswers = parseBatchAnswers(rawAnswer, allQuestionsInfo.length);
+
+        // 依次填写答案
+        for (let i = 0; i < allQuestionsInfo.length; i++) {
+          const q = allQuestionsInfo[i];
+          const answer = allAnswers[i];
+
+          if (!isStudyingChapters) { addLog('已暂停刷章节，停止小测作答', 'info'); return false; }
+
+          if (answer) {
+            fillAnswer(answer, q.element, q.info.type);
+            addLog(`第 ${i + 1} 题已填写答案: ${answer}`, 'debug');
+          }
+
+          await new Promise(r => setTimeout(r, 500));
+        }
+
+        addLog('AI 批量答题完成', 'success');
+
+        // 等待一下再提交
+        await new Promise(r => setTimeout(r, 2000));
+
+        // 尝试自动提交
+        trySubmitAnswer(rootDoc);
+
+        return true;
+      } catch (e) {
+        addLog(`批量答题失败，改用一题一答模式: ${e.message}`, 'warn');
+
+        // 备用：一题一答
+        for (let i = 0; i < allQuestionsInfo.length; i++) {
+          const q = allQuestionsInfo[i];
+          if (!isStudyingChapters) { addLog('已暂停刷章节', 'info'); return false; }
+
+          const ans = await getAnswer(q.info);
+          if (ans) {
+            fillAnswer(ans, q.element, q.info.type);
+          }
+          await new Promise(r => setTimeout(r, 1500));
+        }
+
+        // 尝试提交
+        trySubmitAnswer(rootDoc);
+        return true;
+      }
     } catch (e) { addLog(`章节答题出错: ${e.message}`, 'error'); return false; }
+  }
+
+  // 尝试提交答案
+  function trySubmitAnswer(doc) {
+    const targetWindow = doc.defaultView || window;
+
+    // 方法1: btnBlueSubmit
+    if (typeof targetWindow.btnBlueSubmit === 'function') {
+      addLog('使用 btnBlueSubmit 提交答案', 'info');
+      targetWindow.btnBlueSubmit();
+      setTimeout(() => {
+        if (typeof targetWindow.submitCheckTimes === 'function') {
+          targetWindow.submitCheckTimes();
+          addLog('执行 submitCheckTimes', 'success');
+        }
+      }, 1500);
+      return;
+    }
+
+    // 方法2: submitWork
+    if (typeof targetWindow.submitWork === 'function') {
+      addLog('使用 submitWork 提交答案', 'info');
+      targetWindow.submitWork();
+      return;
+    }
+
+    // 方法3: 查找提交按钮
+    const submitSelectors = [
+      'button[type="submit"]',
+      'input[type="submit"]',
+      '.submit-btn',
+      '.btn-submit',
+      'button:contains("提交")',
+      'a[onclick*="submit"]'
+    ];
+
+    for (const selector of submitSelectors) {
+      const btn = doc.querySelector(selector);
+      if (btn && !btn.disabled) {
+        addLog(`点击提交按钮: ${selector}`, 'info');
+        btn.click();
+        return;
+      }
+    }
+
+    addLog('未找到提交按钮', 'warn');
   }
 
 
@@ -1927,13 +2080,19 @@ decryptChaoXingFont().catch(console.error);
 
   // 批量生成提示词 - 一次性发送所有题目
   function generateBatchPrompt(questionsInfo) {
-    let prompt = `你是一个专业的答题助手。请分析以下所有题目并给出所有答案。
+    // 参数验证
+    if (!questionsInfo || typeof questionsInfo !== 'string') {
+      throw new Error('questionsInfo 必须是有效的字符串');
+    }
+
+    // 构建提示词
+    const prompt = `你是一个专业的答题助手。请分析以下所有题目并给出所有答案。
 
 请严格按照以下 JSON 数组格式返回答案，不要返回任何其他内容：
 [
-  {"questionIndex": 1, "answer": "答案"},
-  {"questionIndex": 2, "answer": "答案"},
-  ...
+  {"questionIndex": 1, "answer": "A"},
+  {"questionIndex": 2, "answer": "B,C"},
+  {"questionIndex": 3, "answer": "答案1,答案2"}
 ]
 
 注意：
@@ -1943,51 +2102,14 @@ decryptChaoXingFont().catch(console.error);
 4. 多选题答案格式：多个字母用逗号分隔如 "A,B" 或 "A,B,D"
 5. 填空题答案格式：用逗号分隔多个答案如 "答案1,答案2"
 
-现在开始答题：
+题目内容：
+${questionsInfo}
 
-`;
-
-    questionsInfo.forEach((q, idx) => {
-      const index = idx + 1;
-      prompt += `\n【题目 ${index}】\n`;
-      prompt += `题型: ${getTypeName(q.type)}\n`;
-      prompt += `题目: ${q.question}\n`;
-
-      if (q.options && q.options.length > 0) {
-        prompt += `选项:\n`;
-        q.options.forEach((opt, optIdx) => {
-          const letter = String.fromCharCode(65 + optIdx);
-          const cleanOption = opt.replace(/^[A-Z][\s.、．。]+|^\d+[\s.、．。]+/, '').trim();
-          prompt += `${letter}. ${cleanOption}\n`;
-        });
-      }
-      prompt += '\n';
-    });
-
-    prompt += `
 请返回 JSON 数组格式的答案：`;
 
     return prompt;
   }
 
-  // 获取题型中文名称
-  function getTypeName(type) {
-    const typeMap = {
-      'single': '单选题',
-      'multiple': '多选题',
-      'judge': '判断题',
-      'blank': '填空题',
-      'cloze': '完形填空',
-      'short': '简答题',
-      'term': '名词解释',
-      'essay': '论述题',
-      'writing': '写作题',
-      'calculation': '计算题',
-      'matching': '连线题',
-      'accounting': '分录题'
-    };
-    return typeMap[type] || '未知题型';
-  }
 
   // 解析批量答案
   function parseBatchAnswers(rawAnswer, expectedCount) {
@@ -2059,66 +2181,64 @@ decryptChaoXingFont().catch(console.error);
   }
 
 
-  async function getAnswer(questionInfo) {
-    addLog(`题目类型: ${questionInfo.type}`, 'info');
-    addLog(`题目内容: ${questionInfo.question}`, 'info');
+  // async function getAnswer(questionInfo) {
 
-    if (questionInfo.options && questionInfo.options.length > 0) {
-      addLog(`选项数量: ${questionInfo.options.length}`, 'info');
-      questionInfo.options.forEach((opt, idx) => {
-        addLog(`选项${String.fromCharCode(65 + idx)}: ${opt}`, 'debug');
-      });
-    }
+  //   if (questionInfo.options && questionInfo.options.length > 0) {
+  //     addLog(`选项数量: ${questionInfo.options.length}`, 'info');
+  //     questionInfo.options.forEach((opt, idx) => {
+  //       addLog(`选项${String.fromCharCode(65 + idx)}: ${opt}`, 'debug');
+  //     });
+  //   }
 
-    try {
+  //   try {
 
-      await ensureAccessAllowed();
-    } catch (e) {
-      addLog(`❌ 权限检查失败: ${String(e && e.message ? e.message : e)}`, 'error');
-      return null;
-    }
+  //     await ensureAccessAllowed();
+  //   } catch (e) {
+  //     addLog(`❌ 权限检查失败: ${String(e && e.message ? e.message : e)}`, 'error');
+  //     return null;
+  //   }
 
-    const prompt = generatePrompt(questionInfo);
+  //   const prompt = generatePrompt(questionInfo);
 
-    addLog(prompt.substring(0, 200) + '...', 'debug');
+  //   addLog(prompt.substring(0, 200) + '...', 'debug');
 
-    try {
-      const modelParams = getModelParams(questionInfo.type);
+  //   try {
+  //     const modelParams = getModelParams(questionInfo.type);
 
-      const startTime = Date.now();
+  //     const startTime = Date.now();
 
 
-      const data = await deepseekChat([
-        { role: "user", content: prompt }
-      ], modelParams);
+  //     const data = await deepseekChat([
+  //       { role: "user", content: prompt }
+  //     ], modelParams);
 
-      const elapsed = Date.now() - startTime;
-      addLog(`⏱️ API 调用完成，耗时: ${elapsed}ms`, 'info');
+  //     const elapsed = Date.now() - startTime;
+  //     addLog(`⏱️ API 调用完成，耗时: ${elapsed}ms`, 'info');
 
-      // 显示完整的 API 响应
-      addLog('📥 API 响应: ' + JSON.stringify(data).substring(0, 200) + '...', 'debug');
+  //     // 显示完整的 API 响应
+  //     addLog('📥 API 响应: ' + JSON.stringify(data).substring(0, 200) + '...', 'debug');
 
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        addLog('❌ 完整响应: ' + JSON.stringify(data), 'debug');
-        throw new Error('Invalid API response format');
-      }
+  //     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+  //       addLog('❌ 完整响应: ' + JSON.stringify(data), 'debug');
+  //       throw new Error('Invalid API response format');
+  //     }
 
-      const answer = data.choices[0].message.content.trim();
-      addLog(answer, 'success');
+  //     const answer = data.choices[0].message.content.trim();
+  //     addLog(answer, 'success');
 
-      // 解析答案
-      addLog('🔧 正在解析答案...', 'debug');
-      const parsedAnswer = parseAnswer(answer, questionInfo.type);
-      addLog(`✅ 解析后的答案: "${parsedAnswer}"`, 'info');
+  //     // 解析答案
+  //     addLog('🔧 正在解析答案...', 'debug');
+  //     const parsedAnswer = parseAnswer(answer, questionInfo.type);
+  //     addLog(`✅ 解析后的答案: "${parsedAnswer}"`, 'info');
 
-      return parsedAnswer;
-    } catch (error) {
-      addLog(`错误类型: ${error.name}`, 'error');
-      addLog(`错误信息: ${error.message}`, 'error');
-      addLog(`错误堆栈: ${error.stack}`, 'debug');
-      return null;
-    }
-  }
+  //     return parsedAnswer;
+  //   } catch (error) {
+  //     addLog(`错误类型: ${error.name}`, 'error');
+  //     addLog(`错误信息: ${error.message}`, 'error');
+  //     addLog(`错误堆栈: ${error.stack}`, 'debug');
+  //     return null;
+  //   }
+  // }
 
   // 解析 DeepSeek 返回的答案
   function parseAnswer(rawAnswer, questionType) {
@@ -2267,7 +2387,6 @@ decryptChaoXingFont().catch(console.error);
 
 
   function fillAnswer(answer, questionElement, type) {
-    addLog('═══════════════════════════════════════════', 'info');
     addLog('📝 开始填写答案', 'info');
     addLog(`🏷️ 题目类型: ${type}`, 'info');
     addLog(`✍️ 答案内容: "${answer}"`, 'info');
@@ -2527,8 +2646,6 @@ decryptChaoXingFont().catch(console.error);
               addLog(`跳过无效的选项字母: ${letter}`, 'error');
               continue;
             }
-
-            addLog(`正在查找选项 ${letter}...`, 'info');
 
             // 查找对应字母的选项 - 检查选项文本是否以该字母开头
             for (let i = 0; i < decryptedOptions.length; i++) {
@@ -2895,7 +3012,6 @@ decryptChaoXingFont().catch(console.error);
       }
 
       const extracted = extractQuestionsContent();
-      console.log(extracted);
 
       if (!extracted) {
         addLog('❌ 无法获取题目内容', 'error');
@@ -2950,7 +3066,7 @@ decryptChaoXingFont().catch(console.error);
           addLog(`📝 题目 ${i + 1}: ${type} - ${questionText.substring(0, 30)}...`, 'info');
         }
       }
-      console.log("所有问题!",allQuestionsInfo);
+
 
       if (allQuestionsInfo.length === 0) {
         addLog('❌ 无法解析任何题目信息', 'error');
@@ -2961,13 +3077,12 @@ decryptChaoXingFont().catch(console.error);
 
       addLog(`✅ 成功收集 ${allQuestionsInfo.length} 道题目信息`, 'success');
 
-      // ================= 一次性发送所有题目给 AI =================
-      addLog('🤖 准备一次性发送所有题目给 DeepSeek AI...', 'info');
 
-      // 生成批量答题提示词
-      const batchPrompt = generateBatchPrompt(allQuestionsInfo.map(q => q.info));
+
+      const data = await getQuestionsContent()
+      const batchPrompt = generateBatchPrompt(data);
       addLog(`📤 提示词长度: ${batchPrompt.length} 字符`, 'info');
-
+      console.log("提示词:", batchPrompt)
       try {
         // 确保有访问权限
         await ensureAccessAllowed();
@@ -2980,7 +3095,6 @@ decryptChaoXingFont().catch(console.error);
           presence_penalty: 0.1
         };
 
-        addLog('🌐 正在调用 DeepSeek API 获取所有答案...', 'info');
         const startTime = Date.now();
 
         const data = await deepseekChat([
@@ -3820,15 +3934,64 @@ decryptChaoXingFont().catch(console.error);
       if (!qs || qs.length === 0) return false;
       addLog(`检测到章节测验，共 ${qs.length} 题，开始作答...`, 'info');
 
+      // 构建题目信息数组
+      const questionsInfo = qs.map(q => ({
+        type: q.type,
+        question: q.question || `题目 ${q.qid}`,
+        options: q.options || []
+      }));
 
-      for (const q of qs) {
-        if (!isStudyingChapters) { addLog('已暂停刷章节，停止测验作答', 'info'); return false; }
-        const promptInfo = { type: q.type, question: q.question || `题目 ${q.qid}`, options: q.options || [] };
-        const ans = await getAnswer(promptInfo);
-        if (ans) {
-          fillQuizAnswer(doc, q.qid, q.type, ans);
+      // 一次性发送所有题目给 AI
+      try {
+        const batchPrompt = generateBatchPrompt(questionsInfo);
+        addLog(`批量提示词长度: ${batchPrompt.length} 字符`, 'debug');
+
+        await ensureAccessAllowed();
+        const modelParams = {
+          temperature: 0.1,
+          max_tokens: 4000,
+          top_p: 0.1,
+          frequency_penalty: 0.1,
+          presence_penalty: 0.1
+        };
+
+        const data = await deepseekChat([
+          { role: "user", content: batchPrompt }
+        ], modelParams);
+
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+          throw new Error('API 响应格式错误');
         }
-        await new Promise(r => setTimeout(r, 500));
+
+        const rawAnswer = data.choices[0].message.content.trim();
+        const allAnswers = parseBatchAnswers(rawAnswer, qs.length);
+
+        // 填写答案
+        for (let i = 0; i < qs.length; i++) {
+          if (!isStudyingChapters) { addLog('已暂停刷章节', 'info'); return false; }
+          const q = qs[i];
+          const answer = allAnswers[i];
+          if (answer) {
+            fillQuizAnswer(doc, q.qid, q.type, answer);
+            addLog(`第 ${i + 1} 题已填写: ${answer}`, 'debug');
+          }
+          await new Promise(r => setTimeout(r, 300));
+        }
+
+        addLog('AI 批量答题完成', 'success');
+      } catch (e) {
+        addLog(`批量答题失败，改用一题一答: ${e.message}`, 'warn');
+
+        // 备用：一题一答
+        for (const q of qs) {
+          if (!isStudyingChapters) { addLog('已暂停刷章节', 'info'); return false; }
+          const promptInfo = { type: q.type, question: q.question || `题目 ${q.qid}`, options: q.options || [] };
+          const ans = await getAnswer(promptInfo);
+          if (ans) {
+            fillQuizAnswer(doc, q.qid, q.type, ans);
+          }
+          await new Promise(r => setTimeout(r, 500));
+        }
       }
 
       addLog('章节测验答题完成，准备提交...', 'success');
