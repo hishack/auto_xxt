@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(node build.js)",
-      "Bash(node -c \"d:\\\\coder\\\\浏览器插件开发\\\\油猴\\\\xxt_tm\\\\xxt.user.js\")"
-    ]
-  }
-}

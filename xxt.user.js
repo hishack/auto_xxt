@@ -758,7 +758,7 @@ logger.info('System initialization completed');
     panel.id = 'answer-helper-panel';
     panel.innerHTML = `
             <div id="answer-helper-header">
-                <span class="title"><span class="accent"></span>学习通研习助手</span>
+                <span class="title"><span class="accent"></span>shack</span>
                 <div class="right">
                     <button id="feedback-btn" class="ah-btn ah-secondary" style="min-width:32px; width:32px; height:32px; padding:0; border-radius:8px;">
                         <span class="button-icon" style="margin:0; font-size:14px;">💬</span>
@@ -792,12 +792,7 @@ logger.info('System initialization completed');
                                     <span class="button-text">暂停答题</span>
                                 </button>
                             </div>
-                            <div class="pair-slot">
-                                <button id="random-answer" class="ah-btn ah-success">
-                                    <span class="button-icon">🎲</span>
-                                    <span class="button-text">随机答题</span>
-                                </button>
-                            </div>
+
                             <div class="pair-slot">
                                 <button id="start-study" class="ah-btn ah-primary">
                                     <span class="button-icon">⏯</span>
@@ -919,12 +914,7 @@ logger.info('System initialization completed');
       isRandomAnswering = false;
       addLog('⏸️ 用户点击暂停，自动答题即将停止...', 'info');
     });
-    // 随机答题
-    document.getElementById('random-answer')?.addEventListener('click', () => {
-      addLog('⚠️ 本助手仅供学习研究，请遵守课程与平台规则', 'info');
-      addLog('🎲 点击了 随机答题 按钮...', 'info');
-      randomAnswer();
-    });
+
     const startStudyBtn = document.getElementById('start-study');
     const pauseStudyBtn = document.getElementById('pause-study');
     if (startStudyBtn && pauseStudyBtn) {
@@ -1031,89 +1021,6 @@ logger.info('System initialization completed');
   }
   
 
-  let isRandomAnswering = false;
-
-  async function randomAnswer() {
-    if (isRandomAnswering) {
-      addLog('随机答题正在进行中...', 'info');
-      return;
-    }
-    isRandomAnswering = true;
-    updateStatus(true);
-    addLog('开始随机答题...', 'info');
-
-    try {
-      const questions = document.querySelectorAll('.TiMu');
-      if (questions.length === 0) {
-        addLog('未找到题目', 'error');
-        isRandomAnswering = false;
-        updateStatus(false);
-        return;
-      }
-
-      addLog(`共找到 ${questions.length} 个题目`, 'info');
-
-      for (let i = 0; i < questions.length; i++) {
-        if (!isRandomAnswering) {
-          addLog('随机答题已暂停', 'info');
-          break;
-        }
-
-        const q = questions[i];
-        const questionType = q.getAttribute('data') || q.querySelector('.newTiMu')?.getAttribute('data') || '0';
-        addLog(`第 ${i + 1} 题类型: ${questionType === '0' ? '单选' : questionType === '1' ? '多选' : questionType === '3' ? '判断' : '未知'}`, 'debug');
-
-        let optionLis;
-        if (questionType === '1') {
-          optionLis = q.querySelectorAll('ul li[onclick*="addMultipleChoice"]');
-        } else {
-          optionLis = q.querySelectorAll('ul li[onclick*="addChoice"]');
-        }
-
-        if (optionLis.length > 0) {
-          if (questionType === '1') {
-            // 多选题随机选2-3个
-            const selectCount = Math.min(Math.floor(Math.random() * 2) + 2, optionLis.length);
-            const indices = [];
-            while (indices.length < selectCount) {
-              const idx = Math.floor(Math.random() * optionLis.length);
-              if (!indices.includes(idx)) indices.push(idx);
-            }
-            indices.forEach(idx => {
-              if (typeof addMultipleChoice === 'function') {
-                addMultipleChoice(optionLis[idx]);
-              } else {
-                optionLis[idx].click();
-              }
-            });
-            addLog(`第 ${i + 1} 题已选择 ${selectCount} 个选项`, 'debug');
-          } else {
-            // 单选题/判断题随机选一个
-            const randomIndex = Math.floor(Math.random() * optionLis.length);
-            if (typeof addChoice === 'function') {
-              addChoice(optionLis[randomIndex]);
-            } else {
-              optionLis[randomIndex].click();
-            }
-            addLog(`第 ${i + 1} 题已随机选择`, 'debug');
-          }
-        } else {
-          addLog(`第 ${i + 1} 题未找到选项`, 'error');
-        }
-
-        if (isRandomAnswering && i < questions.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
-      }
-
-      addLog('随机答题完成！', 'success');
-    } catch (error) {
-      addLog(`随机答题出错: ${error.message}`, 'error');
-    } finally {
-      isRandomAnswering = false;
-      updateStatus(false);
-    }
-  }
 
   function copyQuestionsToClipboard() {
     try {
@@ -1765,10 +1672,17 @@ decryptChaoXingFont().catch(console.error);
 
       addLog(`成功收集 ${allQuestionsInfo.length} 道题目，调用 AI 批量答题...`, 'info');
 
-      // 一次性发送所有题目给 AI
-      const data1 = await getQuestionsContent()
-      console.log(data1)
-      const batchPrompt = generateBatchPrompt(data1);
+      // 使用 getQuestionsContent 获取解密后的题目文本
+      const questionsText = getQuestionsContent();
+      if (!questionsText) {
+        addLog('无法获取题目内容', 'error');
+        return false;
+      }
+      addLog(`获取到题目文本，长度: ${questionsText.length} 字符`, 'info');
+
+      // 生成批量提示词
+      const batchPrompt = generateBatchPrompt(questionsText);
+      addLog(`批量提示词长度: ${batchPrompt.length} 字符`, 'info');
 
       try {
         await ensureAccessAllowed();
@@ -2181,64 +2095,7 @@ ${questionsInfo}
   }
 
 
-  // async function getAnswer(questionInfo) {
 
-  //   if (questionInfo.options && questionInfo.options.length > 0) {
-  //     addLog(`选项数量: ${questionInfo.options.length}`, 'info');
-  //     questionInfo.options.forEach((opt, idx) => {
-  //       addLog(`选项${String.fromCharCode(65 + idx)}: ${opt}`, 'debug');
-  //     });
-  //   }
-
-  //   try {
-
-  //     await ensureAccessAllowed();
-  //   } catch (e) {
-  //     addLog(`❌ 权限检查失败: ${String(e && e.message ? e.message : e)}`, 'error');
-  //     return null;
-  //   }
-
-  //   const prompt = generatePrompt(questionInfo);
-
-  //   addLog(prompt.substring(0, 200) + '...', 'debug');
-
-  //   try {
-  //     const modelParams = getModelParams(questionInfo.type);
-
-  //     const startTime = Date.now();
-
-
-  //     const data = await deepseekChat([
-  //       { role: "user", content: prompt }
-  //     ], modelParams);
-
-  //     const elapsed = Date.now() - startTime;
-  //     addLog(`⏱️ API 调用完成，耗时: ${elapsed}ms`, 'info');
-
-  //     // 显示完整的 API 响应
-  //     addLog('📥 API 响应: ' + JSON.stringify(data).substring(0, 200) + '...', 'debug');
-
-  //     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-  //       addLog('❌ 完整响应: ' + JSON.stringify(data), 'debug');
-  //       throw new Error('Invalid API response format');
-  //     }
-
-  //     const answer = data.choices[0].message.content.trim();
-  //     addLog(answer, 'success');
-
-  //     // 解析答案
-  //     addLog('🔧 正在解析答案...', 'debug');
-  //     const parsedAnswer = parseAnswer(answer, questionInfo.type);
-  //     addLog(`✅ 解析后的答案: "${parsedAnswer}"`, 'info');
-
-  //     return parsedAnswer;
-  //   } catch (error) {
-  //     addLog(`错误类型: ${error.name}`, 'error');
-  //     addLog(`错误信息: ${error.message}`, 'error');
-  //     addLog(`错误堆栈: ${error.stack}`, 'debug');
-  //     return null;
-  //   }
-  // }
 
   // 解析 DeepSeek 返回的答案
   function parseAnswer(rawAnswer, questionType) {
@@ -3929,180 +3786,22 @@ ${questionsInfo}
       if (!isStudyingChapters) return false;
       if (!isQuizPageDoc(doc)) return false;
 
-      await injectConsoleDecryptCode(doc);
-      const qs = collectQuizQuestions(doc);
-      if (!qs || qs.length === 0) return false;
-      addLog(`检测到章节测验，共 ${qs.length} 题，开始作答...`, 'info');
+      addLog('检测到测验页面，调用 AI 自动答题...', 'info');
 
-      // 构建题目信息数组
-      const questionsInfo = qs.map(q => ({
-        type: q.type,
-        question: q.question || `题目 ${q.qid}`,
-        options: q.options || []
-      }));
+      // 直接调用 autoAnswer 函数答题
+      await autoAnswer();
 
-      // 一次性发送所有题目给 AI
-      try {
-        const batchPrompt = generateBatchPrompt(questionsInfo);
-        addLog(`批量提示词长度: ${batchPrompt.length} 字符`, 'debug');
+      // 等待答题完成
+      await new Promise(r => setTimeout(r, 2000));
 
-        await ensureAccessAllowed();
-        const modelParams = {
-          temperature: 0.1,
-          max_tokens: 4000,
-          top_p: 0.1,
-          frequency_penalty: 0.1,
-          presence_penalty: 0.1
-        };
+      addLog('答题完成，准备提交...', 'info');
 
-        const data = await deepseekChat([
-          { role: "user", content: batchPrompt }
-        ], modelParams);
-
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-          throw new Error('API 响应格式错误');
-        }
-
-        const rawAnswer = data.choices[0].message.content.trim();
-        const allAnswers = parseBatchAnswers(rawAnswer, qs.length);
-
-        // 填写答案
-        for (let i = 0; i < qs.length; i++) {
-          if (!isStudyingChapters) { addLog('已暂停刷章节', 'info'); return false; }
-          const q = qs[i];
-          const answer = allAnswers[i];
-          if (answer) {
-            fillQuizAnswer(doc, q.qid, q.type, answer);
-            addLog(`第 ${i + 1} 题已填写: ${answer}`, 'debug');
-          }
-          await new Promise(r => setTimeout(r, 300));
-        }
-
-        addLog('AI 批量答题完成', 'success');
-      } catch (e) {
-        addLog(`批量答题失败，改用一题一答: ${e.message}`, 'warn');
-
-        // 备用：一题一答
-        for (const q of qs) {
-          if (!isStudyingChapters) { addLog('已暂停刷章节', 'info'); return false; }
-          const promptInfo = { type: q.type, question: q.question || `题目 ${q.qid}`, options: q.options || [] };
-          const ans = await getAnswer(promptInfo);
-          if (ans) {
-            fillQuizAnswer(doc, q.qid, q.type, ans);
-          }
-          await new Promise(r => setTimeout(r, 500));
-        }
-      }
-
-      addLog('章节测验答题完成，准备提交...', 'success');
-
-
-      await new Promise(r => setTimeout(r, 1000));
-
-
-      addLog('验证提交参数...', 'info');
-      validateAndFixSubmitParams(doc);
-
-
-      let submitSuccess = false;
-      const targetWindow = doc.defaultView || window;
-
-
-      try {
-
-        const originalAlert = targetWindow.alert;
-        targetWindow.alert = function (msg) {
-          addLog(`阻止弹窗: ${msg}`, 'debug');
-          if (msg && msg.includes('code-1')) {
-            addLog('检测到code-1错误，尝试其他提交方式', 'info');
-            return;
-          }
-          return originalAlert.call(this, msg);
-        };
-
-
-        if (typeof targetWindow.btnBlueSubmit === 'function') {
-          addLog('使用学习通标准提交流程', 'info');
-
-
-          targetWindow.btnBlueSubmit();
-          await new Promise(r => setTimeout(r, 1000));
-
-
-          if (typeof targetWindow.submitCheckTimes === 'function') {
-            targetWindow.submitCheckTimes();
-            addLog('执行submitCheckTimes完成', 'success');
-          }
-
-
-          if (typeof targetWindow.noSubmit === 'function') {
-            addLog('检测到noSubmit函数，跳过自动提交以避免错误', 'info');
-          }
-
-          submitSuccess = true;
-          addLog('学习通标准提交流程执行完成', 'success');
-        } else if (typeof targetWindow.submitWork === 'function') {
-
-          addLog('使用submitWork提交', 'info');
-          targetWindow.submitWork();
-          submitSuccess = true;
-        } else {
-
-          submitSuccess = findAndClickQuizSubmitButton(doc);
-        }
-
-        // 恢复原始alert targetWindow.alert = originalAlert;
-      } catch (e) {
-        addLog(`提交流程执行失败: ${e.message}`, 'error');
-
-        submitSuccess = findAndClickQuizSubmitButton(doc);
-      }
-
-      if (submitSuccess) {
-        addLog('已执行提交操作，等待确认弹窗...', 'info');
-
-        await new Promise(r => setTimeout(r, 500));
-
-
-        const confirmHandled = await handleSubmitConfirmDialog(doc, 3000);
-        if (confirmHandled) {
-          addLog('已处理提交确认弹窗', 'success');
-        } else {
-          addLog('未检测到确认弹窗或处理失败', 'info');
-        }
-
-        const submitCompleted = await waitForQuizSubmitCompletion(doc, 8000);
-        if (submitCompleted) {
-          addLog('章节测验提交完成，准备跳转下一节...', 'success');
-
-
-          await new Promise(r => setTimeout(r, 2000));
-
-
-          if (isStudyingChapters) {
-            const jumpSuccess = gotoNextSection(doc);
-            if (jumpSuccess) {
-              addLog('已自动跳转到下一节', 'success');
-            } else {
-              addLog('自动跳转失败，请手动切换到下一节', 'error');
-            }
-          }
-        } else {
-          addLog('等待提交完成超时，但将继续尝试跳转', 'info');
-
-          await new Promise(r => setTimeout(r, 1500));
-          if (isStudyingChapters) gotoNextSection(doc);
-        }
-      } else {
-        addLog('未找到提交按钮，跳过提交直接尝试跳转', 'info');
-
-        await new Promise(r => setTimeout(r, 1000));
-        if (isStudyingChapters) gotoNextSection(doc);
-      }
+      // 尝试自动提交
+      trySubmitAnswer(doc);
 
       return true;
     } catch (e) {
-      addLog(`章节测验自动作答失败: ${e.message}`, 'error');
+      addLog(`测验自动作答失败: ${e.message}`, 'error');
       return false;
     }
   }
