@@ -1,63 +1,44 @@
 # 超星学习通助手 (CXHelper)
 
-超星学习通(学习通)自动学习助手 - 油猴脚本
+一个免费的开源超星学习通(学习通)自动刷题刷课油猴脚本，基于 DeepSeek AI API 实现智能答题。
 
-## 项目结构
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-green.svg)
 
-```
-xxt_tm/
-├── src/
-│   ├── core/           # 核心模块
-│   │   └── index.js    # Logger, PerformanceMonitor, CacheManager
-│   ├── ui/             # UI模块
-│   │   └── index.js    # 面板创建、事件绑定、拖拽
-│   ├── utils/          # 工具函数
-│   │   └── index.js    # API调用、Cookie操作、模态框
-│   ├── pages/         # 页面逻辑
-│   │   └── index.js    # 视频处理、答题、学习流程
-│   ├── styles/        # 样式
-│   │   └── main.css   # 面板样式
-│   └── index.js       # 入口文件
-├── dist/               # 打包输出
-├── build.js           # 打包脚本
-├── package.json      # 项目配置
-├── user.js           # 原始油猴脚本(未改动)
-└── README.md
-```
+> ⚠️ **本产品仅供学习研究使用，请勿进行商业用途，否则后果自负**
 
-## 开发
+## 功能特点
 
-### 安装依赖
-```bash
-npm install
-```
+- 🤖 **AI 智能答题** - 调用 DeepSeek API 智能分析题目并给出答案
+- 📺 **自动刷课** - 自动观看视频、PPT，自动跳过无关内容
+- 📝 **批量答题** - 支持章节测验答题
+- 📋 **题目提取** - 支持一键提取题目内容到剪贴板
+- 🔐 **字体解密** - 自动解密超星加密字体，完整显示题目
 
-### 打包
-```bash
-npm run build
-```
+### 以下是部分刷题以及相关界面
 
-### 开发模式(监听文件变化)
-```bash
-npm run dev
-```
+![](img/1.png)
 
-### 输出文件
-打包后的油猴脚本位于: `dist/cx-helper.user.js`
+![y](img/2.png)
 
-## 功能
+![](img/3.png)
 
-- 自动学习章节
-- 视频倍速播放
-- 视频进度记录
-- 浮动控制面板
-- 面板拖拽
-- 学习日志
+![](img/4.png)
 
-## 使用
+![](img/5.png)
 
-1. 安装 [Tampermonkey](https://tampermonkey.net/) 浏览器扩展
-2. 打包项目: `npm run build`
-3. 在Tampermonkey中添加新脚本
-4. 将 `dist/cx-helper.user.js` 的内容粘贴进去
-5. 访问超星学习通页面即可使用
+![](img/6.png)
+
+
+
+## 注意事项
+
+1. **api调用**：此项目会调用deepseek api,请执行配置密钥
+2. **学习目的**：本脚本仅辅助学习，请合理使用，切勿完全依赖
+3. **隐私说明**：脚本运行在本地浏览器，不会窃取您的任何资料信息
+
+
+## 插一嘴
+
+  api花费是非常少的,一个课程我猜2毛钱就能把所有题刷完,哈哈,别人刷课的利润为 10 /0.2 = 50,至少五十倍的利润哈哈(不保证题目全对哦)
+
