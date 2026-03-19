@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         超星学习通考试/测验题目提取 (完整解密+导出Word/TXT)
+// @name         超星学习通 - 复制题目 + 自动答题
 // @namespace    http://tampermonkey.net/
-// @version      4.6
-// @description  一键提取学习通章节测验的题目，自动彻底解密乱码（参考字体解密脚本），支持导出Word和TXT，UI美化并置顶。
+// @version      1.1
+// @description  一键复制题目+自动随机答题，可拖动悬浮框
 // @author       2281046977
 // @match        *://*.chaoxing.com/*
 // @match        *://*.edu.cn/*
@@ -19,156 +19,164 @@
   'use strict';
 
   // ================= 配置区 =================
-  // 字体映射表缓存
+  const LOG_MAX_ITEMS = 80;
   let fontHashParams = null;
   let currentFontData = null;
-  let fontLoaded = false; // 标记是否成功加载了页面字体
+  let fontLoaded = false;
+  let isAutoAnswering = false;
 
   // ================= 样式表 =================
-  // 使用最大z-index保证在最上层
   const MAX_Z_INDEX = 2147483647;
 
   const styles = `
-        /* 侧边悬浮按钮 */
-        #cx-tool-panel {
-            position: fixed;
-            top: 150px;
-            left: 10px;
-            z-index: ${MAX_Z_INDEX - 1};
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .cx-btn {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 15px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            font-family: "Microsoft YaHei", sans-serif;
-            text-align: center;
-            transition: all 0.3s;
-        }
-        .cx-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 8px rgba(0,0,0,0.25); }
-        .cx-btn:active { transform: translateY(0); }
-        
-        .cx-btn.primary { background-color: #1890ff; }
-        .cx-btn.success { background-color: #52c41a; }
-        .cx-btn.warning { background-color: #faad14; }
+    #answer-helper-panel {
+      position: fixed;
+      top: 150px;
+      right: 24px;
+      width: 320px;
+      z-index: ${MAX_Z_INDEX - 1};
+      font-family: "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      color: #111827;
+      background: #ffffff;
+      border: 1px solid rgba(0,0,0,0.05);
+      border-radius: 12px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+      overflow: hidden;
+      cursor: move;
+      user-select: none;
+    }
+    #answer-helper-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #6366f1;
+      color: #fff;
+      cursor: move;
+    }
+    #answer-helper-header .title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    #answer-helper-header .right {
+      display: flex;
+      gap: 8px;
+    }
+    #answer-helper-header .collapse-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      border-radius: 6px;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #answer-helper-content {
+      padding: 12px;
+    }
+    #answer-log {
+      height: 120px;
+      overflow-y: auto;
+      border: 1px solid #f3f4f6;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      background: #f9fafb;
+      color: #4b5563;
+      margin-bottom: 12px;
+    }
+    #answer-log::-webkit-scrollbar { width: 6px; }
+    #answer-log::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
 
-        /* 弹窗遮罩 */
-        #cx-preview-modal {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(2px);
-            z-index: ${MAX_Z_INDEX};
-            display: none;
-            justify-content: center;
-            align-items: center;
-        }
-        /* 弹窗主体 */
-        .cx-modal-content {
-            background: white;
-            width: 800px;
-            max-width: 90%;
-            height: 85vh;
-            padding: 24px;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            animation: cxModalFadeIn 0.3s ease;
-        }
-        @keyframes cxModalFadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        
-        .cx-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 16px;
-        }
-        .cx-modal-title { font-size: 20px; font-weight: bold; color: #333; }
-        .cx-close-btn {
-            cursor: pointer;
-            font-size: 28px;
-            color: #999;
-            line-height: 20px;
-            transition: color 0.2s;
-        }
-        .cx-close-btn:hover { color: #333; }
+    .log-item { margin: 3px 0; padding: 4px 8px; border-radius: 6px; background: #ffffff; border: 1px solid #f3f4f6; }
+    .log-item.success { color: #059669; border-left: 3px solid #10b981; }
+    .log-item.error { color: #dc2626; border-left: 3px solid #ef4444; }
+    .log-item.info { color: #374151; border-left: 3px solid #6b7280; }
+    .log-item.debug { color: #9ca3af; border-left: 3px solid #d1d5db; }
 
-        #cx-preview-text {
-            flex: 1;
-            width: 100%;
-            resize: none;
-            padding: 16px;
-            border: 1px solid #d9d9d9;
-            border-radius: 6px;
-            font-family: Consolas, Monaco, "Courier New", monospace;
-            font-size: 14px;
-            line-height: 1.6;
-            overflow-y: auto;
-            background: #f9f9f9;
-            color: #333;
-        }
-        #cx-preview-text:focus { outline: 2px solid #1890ff; border-color: transparent; }
+    .ah-btn {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #374151;
+      background: #ffffff;
+    }
+    .ah-btn:hover { background: #f9fafb; border-color: #d1d5db; transform: translateY(-1px); }
+    .ah-btn:active { transform: translateY(0); }
 
-        .cx-modal-footer {
-            margin-top: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .cx-status-text {
-            font-size: 13px;
-            color: #666;
-            background: #f0f0f0;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-        .cx-btn-group {
-            display: flex;
-            gap: 12px;
-        }
-    `;
+    .ah-primary { background: #6366f1; color: #ffffff; border-color: #4f46e5; }
+    .ah-primary:hover { background: #4f46e5; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+
+    .ah-success { background: #10b981; color: #ffffff; border-color: #059669; }
+    .ah-success:hover { background: #059669; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+
+    .panel-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .panel-actions .ah-btn {
+      flex: 1;
+    }
+  `;
+
+  // ================= 调试日志 =================
+
+  function addLog(message, type = 'info') {
+    try {
+      const logContainer = document.getElementById('answer-log');
+      if (!logContainer) return;
+
+      const text = String(message || '').replace(/\s+/g, ' ').slice(0, 120);
+      const logItem = document.createElement('div');
+      logItem.className = `log-item ${type}`;
+      logItem.textContent = `${new Date().toLocaleTimeString()} - ${text}`;
+      logContainer.appendChild(logItem);
+
+      const items = logContainer.querySelectorAll('.log-item');
+      if (items.length > LOG_MAX_ITEMS) {
+        logContainer.removeChild(logContainer.firstElementChild);
+      }
+
+      logContainer.scrollTop = logContainer.scrollHeight;
+    } catch { }
+  }
 
   // ================= 解密核心逻辑 =================
 
-  // 初始化解密表
   function initDecryption() {
     try {
       const tableText = GM_getResourceText('Table');
       if (tableText) {
         fontHashParams = JSON.parse(tableText);
-        console.log('ChaoxingExtractor: 字体映射表加载成功, 条目数:', Object.keys(fontHashParams).length);
+        addLog(`字体映射表加载成功, 条目数: ${Object.keys(fontHashParams).length}`, 'success');
       } else {
-        console.warn('ChaoxingExtractor: 字体映射表为空');
+        addLog('字体映射表为空', 'error');
       }
     } catch (e) {
-      console.error('ChaoxingExtractor: 加载字体映射表失败', e);
+      addLog(`加载字体映射表失败: ${e.message}`, 'error');
     }
   }
 
-  // 解析当前页面的加密字体
   function parsePageFont() {
-    // 优先查找包含 font-cxsecret 的 style 标签
-    // 很多时候字体定义在很长的 base64 串中
-    const styles = document.getElementsByTagName('style');
+    const styleTags = document.getElementsByTagName('style');
     let fontBase64 = null;
 
-    for (let style of styles) {
+    for (let style of styleTags) {
       const content = style.textContent;
       if (content.includes('font-cxsecret') && content.includes('base64,')) {
-        // 正则提取 base64 内容，兼容换行和不同结束符
         const match = content.match(/base64,([\w\W]+?)'/);
         if (match && match[1]) {
           fontBase64 = match[1];
@@ -179,300 +187,278 @@
 
     if (fontBase64) {
       try {
-        // 处理 Base64
         const binary_string = window.atob(fontBase64);
         const len = binary_string.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) {
           bytes[i] = binary_string.charCodeAt(i);
         }
-
-        // Typr 解析
         const font = Typr.parse(bytes)[0];
         currentFontData = font;
         fontLoaded = true;
-        console.log('ChaoxingExtractor: 页面加密字体解析成功');
+        addLog('页面加密字体解析成功', 'success');
       } catch (e) {
-        console.error('ChaoxingExtractor: 解析字体出错', e);
         fontLoaded = false;
+        addLog(`解析字体出错: ${e.message}`, 'error');
       }
     } else {
-      console.log('ChaoxingExtractor: 未在页面找到加密字体 (font-cxsecret) 或已无需解密');
       fontLoaded = false;
+      addLog('未找到加密字体或已无需解密', 'debug');
     }
   }
 
-  // 获取MD5函数
   function getMd5Fn() {
-    // 兼容各种加载方式
     if (typeof md5 === 'function') return md5;
     if (typeof Typr !== 'undefined' && typeof Typr.md5 === 'function') return Typr.md5;
     if (window.md5) return window.md5;
     return null;
   }
 
-  // 将文本中的乱码解密 (关键修复)
   function decryptText(text) {
     if (!text) return "";
-    // 如果没有字体数据或者映射表，直接返回原文本
     if (!fontHashParams || !currentFontData) return text;
 
     const md5Fn = getMd5Fn();
-    if (!md5Fn) {
-      console.warn('ChaoxingExtractor: 未找到MD5函数，无法解密');
-      return text;
-    }
+    if (!md5Fn) return text;
 
     let result = "";
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
       const code = char.charCodeAt(0);
-
-      // 尝试获取字形索引
       const glyphIndex = Typr.U.codeToGlyph(currentFontData, code);
 
-      // 如果 glyphIndex > 0，说明这个字符在这个自定义字体里有定义
       if (glyphIndex > 0) {
-        // 获取字形路径
         const path = Typr.U.glyphToPath(currentFontData, glyphIndex);
         if (path) {
           const pathStr = JSON.stringify(path);
-
-          // 【关键修复】：参考“字体解密.js”，需要 slice(24) 截取后8位
           const hash = md5Fn(pathStr).slice(24);
-
-          // 查找 hash 对应的文字
           let match = fontHashParams[hash];
 
           if (match) {
-            // 映射表中存储的是 unicode 编码 (int)，需要转回字符
-            // 有些表存的是字符，有些是int，做个兼容
             if (typeof match === 'number') {
               result += String.fromCharCode(match);
             } else {
               result += match;
             }
-            continue; // 找到替换，跳过原字符
+            continue;
           }
         }
       }
-      // 没找到或者不用替换，保留原字符
       result += char;
     }
     return result;
   }
 
-  // ================= 提取逻辑 =================
+  // ================= 提取题目 =================
 
-  function extractContent() {
-    // 每次提取前尝试刷新一下字体解析
+  function extractQuestions() {
     parsePageFont();
-
     const questions = document.querySelectorAll('.TiMu');
     if (questions.length === 0) return null;
 
-    let resultText = "";
-    // 用于导出 Word 的 HTML 结构
-    let rawHtml = `
-            <html>
-            <head>
-                <meta charset='utf-8'>
-                <title>学习通习题导出</title>
-                <style>
-                    body { font-family: 'SimSun', '宋体', serif; line-height: 1.6; }
-                    .q-block { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
-                    .q-title { font-weight: bold; font-size: 16px; margin-bottom: 10px; }
-                    .q-opt { margin-left: 20px; }
-                    .q-ans { margin-top: 10px; background: #f5f5f5; padding: 8px; color: #d32f2f; font-weight: bold; }
-                </style>
-            </head>
-            <body>
-            <h1 style="text-align:center;">学习通习题导出</h1>
-        `;
+    addLog(`找到 ${questions.length} 个题目`, 'info');
 
+    let resultText = "";
     questions.forEach((q, index) => {
-      // --- 题目 ---
       let titleDiv = q.querySelector('.Zy_TItle .clearfix') ||
         q.querySelector('.Zy_TItle') ||
         q.querySelector('.newZy_TItle') ||
-        q.querySelector('.fontLabel'); // 兼容更多选择器
+        q.querySelector('.fontLabel');
 
-      // 深度清理文本，处理可能存在的隐藏元素
       let titleText = titleDiv ? titleDiv.innerText.replace(/\s+/g, ' ').trim() : "未找到题目";
-
-      // 【解密】
       titleText = decryptText(titleText);
-
       resultText += `【${index + 1}】 ${titleText}\n`;
-      rawHtml += `<div class="q-block"><p class="q-title">【${index + 1}】 ${titleText}</p><ul>`;
 
-      // --- 选项 ---
-      // 兼容 li 下直接是文本，或者 p 标签，或者 a 标签的情况
       const options = q.querySelectorAll('ul li');
       if (options.length > 0) {
         options.forEach(opt => {
           let optText = opt.innerText.replace(/\s+/g, ' ').trim();
           optText = decryptText(optText);
-
-          // 判断是否被选中/正确
-          const isChecked = opt.querySelector('input:checked') || opt.querySelector('.ri') || opt.querySelector('.dui');
-          const mark = isChecked ? " [已选]" : "";
-
-          resultText += `\t${optText}${mark}\n`;
-          rawHtml += `<li class="q-opt">${optText}${mark}</li>`;
+          resultText += `\t${optText}\n`;
         });
       }
-
-      // --- 答案/解析提取 ---
-      const answerDiv = q.querySelector('.newAnswerBx') || q.querySelector('.answerBx') || q.querySelector('.lookAnswer');
-
-      if (answerDiv) {
-        let answerBlockText = answerDiv.innerText.replace(/\s+/g, ' ').trim();
-        answerBlockText = decryptText(answerBlockText);
-
-        if (answerBlockText) {
-          resultText += `\n${answerBlockText}\n`;
-          rawHtml += `</ul><div class="q-ans">${answerBlockText}</div></div>`;
-        } else {
-          rawHtml += `</ul></div>`;
-        }
-      } else {
-        rawHtml += `</ul></div>`;
-      }
-
       resultText += "\n----------------------------------------\n\n";
     });
 
-    rawHtml += "</body></html>";
-    return { text: resultText, html: rawHtml, count: questions.length };
+    addLog(`提取完成，共 ${questions.length} 题`, 'success');
+    return resultText;
   }
 
-  // ================= 导出功能函数 =================
+  // ================= 自动答题 =================
 
-  // 获取动态文件名
-  function getExportFileName(extension) {
-    let name = "学习通题目";
+  function autoAnswer() {
+    if (isAutoAnswering) {
+      addLog('正在自动答题中...', 'info');
+      return;
+    }
+    isAutoAnswering = true;
 
-    // 优先尝试用户指定的选择器
-    const userSelector = document.querySelector("#RightCon > div.radiusBG > div > div.ceyan_name > h3");
-    // 备用选择器
-    const fallbackSelector = document.querySelector(".ceyan_name h3") || document.querySelector("h3");
-
-    const target = userSelector || fallbackSelector;
-
-    if (target && target.innerText) {
-      name = target.innerText.replace(/\s+/g, ' ').trim();
-    } else if (document.title) {
-      name = document.title.replace(/\s+/g, ' ').trim();
+    const questions = document.querySelectorAll('.TiMu');
+    if (questions.length === 0) {
+      addLog('未找到题目', 'error');
+      isAutoAnswering = false;
+      return;
     }
 
-    // 去除文件名非法字符
-    name = name.replace(/[\\/:*?"<>|]/g, "_");
+    addLog(`开始自动答题，共 ${questions.length} 题`, 'info');
 
-    const date = new Date();
-    const timeStr = `${date.getMonth() + 1}月${date.getDate()}日`;
+    let answered = 0;
+    questions.forEach((q, index) => {
+      setTimeout(() => {
+        // 获取题目类型 (0=单选, 1=多选, 3=判断)
+        const questionType = q.getAttribute('data') || q.querySelector('.newTiMu')?.getAttribute('data') || '0';
+        addLog(`第 ${index + 1} 题类型: ${questionType}`, 'debug');
 
-    return `${name}_${timeStr}.${extension}`;
+        // 查找选项li元素
+        let optionLis;
+        if (questionType === '1') {
+          // 多选题 - 使用 addMultipleChoice
+          optionLis = q.querySelectorAll('ul li[onclick*="addMultipleChoice"]');
+        } else {
+          // 单选题/判断题 - 使用 addChoice
+          optionLis = q.querySelectorAll('ul li[onclick*="addChoice"]');
+        }
+
+        addLog(`第 ${index + 1} 题找到 ${optionLis.length} 个选项`, 'debug');
+
+        if (optionLis.length > 0) {
+          if (questionType === '1') {
+            // 多选题随机选2-3个
+            const selectCount = Math.min(Math.floor(Math.random() * 2) + 2, optionLis.length);
+            const indices = [];
+            while (indices.length < selectCount) {
+              const idx = Math.floor(Math.random() * optionLis.length);
+              if (!indices.includes(idx)) indices.push(idx);
+            }
+            indices.forEach(idx => {
+              if (typeof addMultipleChoice === 'function') {
+                addMultipleChoice(optionLis[idx]);
+              } else {
+                optionLis[idx].click();
+              }
+            });
+            answered++;
+            addLog(`第 ${index + 1} 题已选择 ${selectCount} 个选项`, 'debug');
+          } else {
+            // 单选题/判断题随机选一个
+            const randomIndex = Math.floor(Math.random() * optionLis.length);
+            if (typeof addChoice === 'function') {
+              addChoice(optionLis[randomIndex]);
+            } else {
+              optionLis[randomIndex].click();
+            }
+            answered++;
+            addLog(`第 ${index + 1} 题已随机选择`, 'debug');
+          }
+        }
+
+        if (index === questions.length - 1) {
+          setTimeout(() => {
+            addLog(`自动答题完成！已回答 ${answered} 题`, 'success');
+            isAutoAnswering = false;
+          }, 500);
+        }
+      }, index * 800);
+    });
   }
 
-  function exportToWord(htmlContent) {
-    const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = getExportFileName('doc');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  // ================= 可拖动悬浮框 =================
+
+  function makeDraggable(element) {
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    const header = element.querySelector('#answer-helper-header');
+    if (!header) return;
+
+    header.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      offsetX = e.clientX - element.getBoundingClientRect().left;
+      offsetY = e.clientY - element.getBoundingClientRect().top;
+      element.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      element.style.left = (e.clientX - offsetX) + 'px';
+      element.style.top = (e.clientY - offsetY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      element.style.cursor = 'move';
+    });
   }
 
-  function exportToTxt(textContent) {
-    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = getExportFileName('txt');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
+  // ================= 创建UI =================
 
-  function showModal(data) {
-    let modal = document.getElementById('cx-preview-modal');
-    // 状态文本
-    const statusStr = `字体解密状态: ${fontLoaded ? '✅ 字体已解析' : '⚠️ 无加密字体'} | 映射表: ${fontHashParams ? '✅ 已加载' : '❌ 未加载'}`;
+  function createPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'answer-helper-panel';
+    panel.innerHTML = `
+      <div id="answer-helper-header">
+        <span class="title">📚 学习通助手</span>
+        <div class="right">
+          <button class="collapse-btn" title="折叠/展开">
+            <span style="font-size: 12px;">▼</span>
+          </button>
+        </div>
+      </div>
+      <div id="answer-helper-content">
+        <div id="answer-log"></div>
+        <div class="panel-actions">
+          <button id="copy-questions" class="ah-btn ah-primary">
+            <span>📋</span>
+            <span>复制题目</span>
+          </button>
+          <button id="auto-answer" class="ah-btn ah-success">
+            <span>🎲</span>
+            <span>自动答题</span>
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(panel);
 
-    if (!modal) {
-      const modalHtml = `
-                <div id="cx-preview-modal">
-                    <div class="cx-modal-content">
-                        <div class="cx-modal-header">
-                            <span class="cx-modal-title">📝 题目预览 (共 ${data.count} 题)</span>
-                            <span class="cx-close-btn" onclick="document.getElementById('cx-preview-modal').style.display='none'">&times;</span>
-                        </div>
-                        <textarea id="cx-preview-text" readonly></textarea>
-                        <div class="cx-modal-footer">
-                            <span class="cx-status-text" id="cx-status-info">${statusStr}</span>
-                            <div class="cx-btn-group">
-                                <button class="cx-btn primary" id="cx-copy-btn">复制全部</button>
-                                <button class="cx-btn warning" id="cx-txt-btn">导出 TXT</button>
-                                <button class="cx-btn success" id="cx-word-btn">导出 Word</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-      modal = document.getElementById('cx-preview-modal');
-
-      // 绑定事件
-      document.getElementById('cx-copy-btn').onclick = () => {
-        const text = document.getElementById('cx-preview-text').value;
+    // 绑定事件
+    document.getElementById('copy-questions').onclick = () => {
+      const text = extractQuestions();
+      if (text) {
         GM_setClipboard(text);
+        addLog('题目已复制到剪贴板', 'success');
+      } else {
+        addLog('未找到题目', 'error');
+      }
+    };
 
-        // 简单的提示动画
-        const btn = document.getElementById('cx-copy-btn');
-        const originalText = btn.innerText;
-        btn.innerText = '已复制！';
-        btn.style.backgroundColor = '#52c41a';
-        setTimeout(() => {
-          btn.innerText = originalText;
-          btn.style.backgroundColor = '';
-        }, 1500);
-      };
+    document.getElementById('auto-answer').onclick = () => {
+      autoAnswer();
+    };
 
-      document.getElementById('cx-word-btn').onclick = () => {
-        const currentData = extractContent(); // 重新获取以防变动
-        if (currentData) exportToWord(currentData.html);
-      };
+    // 折叠功能
+    const collapseBtn = panel.querySelector('.collapse-btn');
+    const content = panel.querySelector('#answer-helper-content');
+    let isCollapsed = false;
+    collapseBtn.onclick = () => {
+      isCollapsed = !isCollapsed;
+      content.style.display = isCollapsed ? 'none' : 'block';
+      collapseBtn.querySelector('span').textContent = isCollapsed ? '▲' : '▼';
+    };
 
-      document.getElementById('cx-txt-btn').onclick = () => {
-        const currentData = extractContent();
-        if (currentData) exportToTxt(currentData.text);
-      };
-
-      // 点击遮罩关闭
-      modal.onclick = (e) => {
-        if (e.target === modal) modal.style.display = 'none';
-      };
-
-    } else {
-      // 更新状态
-      document.getElementById('cx-status-info').innerText = statusStr;
-    }
-
-    document.getElementById('cx-preview-text').value = data.text;
-    modal.style.display = 'flex';
+    makeDraggable(panel);
+    return panel;
   }
 
   // ================= 初始化 =================
 
   function init() {
-    // TiMu 是题目块，如果没有题目块则不显示按钮
     const check = document.querySelectorAll('.TiMu');
-    if (check.length === 0) return;
+    if (check.length === 0) {
+      addLog('未检测到题目页面', 'debug');
+      return;
+    }
+
+    addLog('检测到题目页面，初始化中...', 'info');
 
     initDecryption();
     parsePageFont();
@@ -481,68 +467,16 @@
     styleEl.innerHTML = styles;
     document.head.appendChild(styleEl);
 
-    const toolPanel = document.createElement('div');
-    toolPanel.id = 'cx-tool-panel';
-
-    // 主按钮：提取并预览
-    const mainBtn = document.createElement('button');
-    mainBtn.className = 'cx-btn primary';
-    mainBtn.innerHTML = '📑 提取题目';
-    mainBtn.title = '点击提取本页所有题目、选项及答案并预览';
-    mainBtn.onclick = () => {
-      const data = extractContent();
-      if (data) {
-        showModal(data);
-      } else {
-        alert('未找到题目，请确保在测验页面内');
-      }
-    };
-
-    // 快速下载按钮组
-    const downloadGroup = document.createElement('div');
-    downloadGroup.style.display = 'flex';
-    downloadGroup.style.gap = '5px'; // 按钮间距
-
-    const wordBtn = document.createElement('button');
-    wordBtn.className = 'cx-btn success';
-    wordBtn.style.flex = '1'; // 均分宽度
-    wordBtn.style.padding = '8px 5px';
-    wordBtn.innerHTML = '⬇️ Word';
-    wordBtn.title = '直接导出 Word 文档';
-    wordBtn.onclick = () => {
-      const data = extractContent();
-      if (data) exportToWord(data.html);
-      else alert('未找到题目');
-    };
-
-    const txtBtn = document.createElement('button');
-    txtBtn.className = 'cx-btn warning';
-    txtBtn.style.flex = '1'; // 均分宽度
-    txtBtn.style.padding = '8px 5px';
-    txtBtn.innerHTML = '⬇️ TXT';
-    txtBtn.title = '直接导出 TXT 文件';
-    txtBtn.onclick = () => {
-      const data = extractContent();
-      if (data) exportToTxt(data.text);
-      else alert('未找到题目');
-    };
-
-    downloadGroup.appendChild(wordBtn);
-    downloadGroup.appendChild(txtBtn);
-
-    toolPanel.appendChild(mainBtn);
-    toolPanel.appendChild(downloadGroup);
-    document.body.appendChild(toolPanel);
+    createPanel();
+    addLog('助手加载完成', 'success');
   }
 
-  // 延时加载，确保页面元素特别是iframe加载完成
   setTimeout(() => {
     if (document.readyState === 'complete') {
       init();
     } else {
       window.addEventListener('load', init);
     }
-  }, 2000); // 稍微延长等待时间
-
+  }, 2000);
 
 })();

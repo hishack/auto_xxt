@@ -1,21 +1,18 @@
 // ==UserScript==
-// @name         学习通自动刷课刷题（DeepSeek版）
+// @name         🏅学习通AI研习助手|💡智能刷课+自动答题|🛠️ 无需配置|♾️不限次数永久使用|🤖 AI智能答题|🔄长期维护更新
 // @namespace    http://tampermonkey.net/
-// @version      2.0.0
-// @description  使用 DeepSeek API 自动答题，支持自动刷课、自动答题、题目提取复制、字体解密。需要自行配置 DeepSeek API 密钥。
-// @author       kail (Modified)
+// @version      1.1.9
+// @description  采用AI大模型，题目识别准、作答快，所有题目均可作答。支持自动刷课、自动答题、自动完成章节测试，简洁界面、稳定服务，持续适配平台更新。
+// @author       kail
 // @match        *://*.chaoxing.com/*
-// @match        *://*.edu.cn/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
 // @grant        GM_getResourceText
-// @grant        GM_setClipboard
-// @grant        GM_setValue
-// @grant        GM_getValue
-// @connect      api.deepseek.com
-// @require      https://scriptcat.org/lib/668/1.0/TyprMd5.js
-// @resource     Table https://www.forestpolice.org/ttf/2.0/table.json
-// @license      MIT
+// @connect      api.116611.xyz
+// @resource     typrMd5Lib https://116611.xyz/typr-md5.js
+// @resource     fontTableData https://116611.xyz/table.json
+// @license CC-BY-NC-ND-4.0
+// @antifeature  payment  脚本存在第三方答题接口付费功能
 
 // ==/UserScript==
 
@@ -799,7 +796,7 @@ logger.info('System initialization completed');
         #answer-helper-panel .cx-trial-badge .trial-buy-btn:hover { background: #e0e7ff; border-color: #c7d2fe; }
     `);
 
-//创建界面
+
   function createPanel() {
     const panel = document.createElement('div');
     panel.id = 'answer-helper-panel';
@@ -1555,30 +1552,11 @@ decryptChaoXingFont().catch(console.error);
         if (ok) return true;
       }
 
-      // 优先使用学习通标准选择器 .TiMu（参考 jm.user.js）
-      const possibleSelectors = [
-        '.TiMu',                    // 学习通标准题目类名（最优先）
-        '.questionLi',              // 常见题目列表项
-        '.question',                // 通用题目类
-        '.subject_item',            // 科目项
-        '.examPaper_subject',       // 试卷题目
-        '.questionContainer',       // 题目容器
-        '.q-item',                  // 题目项
-        '.subject_node',            // 科目节点
-        '.ti-item',                 // 题项
-        '.exam-item',               // 考试项
-        '[class*="question"]',      // 包含question的类名
-        '[class*="subject"]',       // 包含subject的类名
-        '[class*="TiMu"]',          // 包含TiMu的类名
-        '[class*="timu"]'           // 包含timu的类名（小写）
-      ];
+      const possibleSelectors = ['.question', '.questionLi', '.subject_item', '.examPaper_subject', '.questionContainer', '.q-item', '.subject_node', '[class*="question"]', '[class*="subject"]', '.ti-item', '.exam-item'];
       let questions = [];
       for (let selector of possibleSelectors) {
         questions = rootDoc.querySelectorAll(selector);
-        if (questions.length > 0) {
-          addLog(`使用选择器 "${selector}" 找到 ${questions.length} 个题目`, 'debug');
-          break;
-        }
+        if (questions.length > 0) break;
       }
       if (questions.length === 0) return false;
       addLog(`章节内发现 ${questions.length} 个题目，自动作答...`, 'info');
@@ -1605,7 +1583,7 @@ decryptChaoXingFont().catch(console.error);
     const tryDoc = (doc) => {
       try {
         if (doc.querySelector('video, .video-js, .ans-attach-ct, .reader, .ppt, .ppt-play, .catalog, .vjs-play-control')) { found = true; return; }
-        if (doc.querySelector('.TiMu, .questionLi, .question, .subject_item, .examPaper_subject, .questionContainer, .q-item, .subject_node, [class*="question"], .ti-item, .exam-item')) { found = true; return; }
+        if (doc.querySelector('.question, .questionLi, .subject_item, .examPaper_subject, .questionContainer, .q-item, .subject_node, [class*="question"], .ti-item, .exam-item')) { found = true; return; }
       } catch { }
     };
     forEachSameOriginFrame(tryDoc);
@@ -1816,23 +1794,17 @@ decryptChaoXingFont().catch(console.error);
         '.stem_type'
       ];
 
-      // 参考 jm.user.js 的题目选择器
       const possibleQuestionSelectors = [
-        '.Zy_TItle .clearfix',      // 学习通标准题目标题（来自 jm.user.js）
-        '.Zy_TItle',                // 学习通题目标题
-        '.newZy_TItle',             // 新版学习通题目标题
-        '.fontLabel',               // 字体标签
-        '.subject_describe',        // 科目描述
-        '.mark_name',               // 标记名称
-        '.questionContent',         // 题目内容
-        '.title',                   // 标题
-        'div[class*="title"]',      // 包含title的div
-        'div[class*="Title"]',      // 包含Title的div（大写）
-        '.subject_stem',            // 科目主干
-        '.q-body',                  // 题目主体
-        '.question-content',        // 题目内容
-        '.stem-content',            // 主干内容
-        '.stem_txt'                 // 主干文本
+        '.subject_describe',
+        '.mark_name',
+        '.questionContent',
+        '.title',
+        'div[class*="title"]',
+        '.subject_stem',
+        '.q-body',
+        '.question-content',
+        '.stem-content',
+        '.stem_txt'
       ];
 
 
@@ -1872,19 +1844,15 @@ decryptChaoXingFont().catch(console.error);
       }
 
 
-      // 参考 jm.user.js 的选项选择器
       const optionSelectors = [
-        'ul li',                    // 学习通标准选项结构（来自 jm.user.js）
-        '.stem_answer > div',       // 答案区域的直接子div
-        '.stem_answer div[class*="option"]',  // 答案区域中包含option的div
-        'div.stem_answer > div',    // 答案区域的div子元素
-        `#${questionId} > div.stem_answer > div`,  // 特定题目ID的答案div
-        '.answer_p',                // 答案段落
-        '.subject_node',            // 科目节点
-        '.answer_options',          // 答案选项
-        '.options div',             // 选项div
-        '.answerBg ul li',          // 答案背景中的列表项
-        'ul.answerBg li'            // 答案背景列表项
+        '.stem_answer > div',
+        '.stem_answer div[class*="option"]',
+        'div.stem_answer > div',
+        `#${questionId} > div.stem_answer > div`,
+        '.answer_p',
+        '.subject_node',
+        '.answer_options',
+        '.options div'
       ];
 
       let options = [];
@@ -1919,15 +1887,6 @@ decryptChaoXingFont().catch(console.error);
       if (!type || !questionText) {
         addLog('未能完全识别题目信息', 'error');
       }
-
-      // 自动打印题目到控制台
-      console.log('========== 检测到题目 ==========');
-      console.log('类型:', typeText || type);
-      console.log('题目:', questionText);
-      if (options.length > 0) {
-        console.log('选项:', options);
-      }
-      console.log('==============================');
 
       return {
         type,
@@ -2496,7 +2455,7 @@ decryptChaoXingFont().catch(console.error);
       }
 
 
-      const questions = doc.querySelectorAll('.TiMu, .questionLi, .question, .subject_item, .examPaper_subject, .questionContainer, .q-item, .subject_node, [class*="question"], .ti-item, .exam-item');
+      const questions = doc.querySelectorAll('.question, .questionLi, .subject_item, .examPaper_subject, .questionContainer, .q-item, .subject_node, [class*="question"], .ti-item, .exam-item');
       for (const q of questions) {
         if (!isQuestionAnswered(q)) {
           return false;
@@ -2555,22 +2514,18 @@ decryptChaoXingFont().catch(console.error);
       addLog('当前页面标题: ' + document.title, 'debug');
 
 
-      // 优先使用学习通标准选择器（参考 jm.user.js 的成功经验）
       const possibleSelectors = [
-        '.TiMu',                    // 学习通标准题目类名（最优先，来自 jm.user.js）
-        '.questionLi',              // 常见题目列表项
-        '.question',                // 通用题目类
-        '.subject_item',            // 科目项
-        '.examPaper_subject',       // 试卷题目
-        '.questionContainer',       // 题目容器
-        '.q-item',                  // 题目项
-        '.subject_node',            // 科目节点
-        '.ti-item',                 // 题项
-        '.exam-item',               // 考试项
-        '[class*="TiMu"]',          // 包含TiMu的类名
-        '[class*="timu"]',          // 包含timu的类名（小写）
-        '[class*="question"]',      // 包含question的类名
-        '[class*="subject"]'        // 包含subject的类名
+        '.question',
+        '.questionLi',
+        '.subject_item',
+        '.examPaper_subject',
+        '.questionContainer',
+        '.q-item',
+        '.subject_node',
+        '[class*="question"]',
+        '[class*="subject"]',
+        '.ti-item',
+        '.exam-item'
       ];
 
       let questions = [];

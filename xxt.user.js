@@ -785,11 +785,17 @@ logger.info('System initialization completed');
                             <div class="pair-slot">
                                 <button id="start-answer" class="ah-btn ah-primary">
                                     <span class="button-icon">▶</span>
-                                    <span class="button-text">一键答题</span>
+                                    <span class="button-text">AI答题</span>
                                 </button>
                                 <button id="pause-answer" class="ah-btn ah-danger" style="display:none;">
                                     <span class="button-icon">⏸</span>
                                     <span class="button-text">暂停答题</span>
+                                </button>
+                            </div>
+                            <div class="pair-slot">
+                                <button id="random-answer" class="ah-btn ah-success">
+                                    <span class="button-icon">🎲</span>
+                                    <span class="button-text">随机答题</span>
                                 </button>
                             </div>
                             <div class="pair-slot">
@@ -900,14 +906,24 @@ logger.info('System initialization completed');
   }
 
   function bindPanelEvents() {
+    // AI答题按钮
     document.getElementById('start-answer')?.addEventListener('click', () => {
-      addLog('本助手仅供学习研究，请遵守课程与平台规则。', 'info');
-      addLog('开始自动答题...');
+
+      addLog('⚠️ 本助手仅供学习研究，请遵守课程与平台规则', 'info');
+      addLog('🎯 点击了 AI答题 按钮，开始自动答题...', 'info');
+      addLog('📍 当前页面: ' + window.location.href, 'debug');
       autoAnswer();
     });
     document.getElementById('pause-answer')?.addEventListener('click', () => {
       isAnswering = false;
-      addLog('正在暂停自动答题...', 'info');
+      isRandomAnswering = false;
+      addLog('⏸️ 用户点击暂停，自动答题即将停止...', 'info');
+    });
+    // 随机答题
+    document.getElementById('random-answer')?.addEventListener('click', () => {
+      addLog('⚠️ 本助手仅供学习研究，请遵守课程与平台规则', 'info');
+      addLog('🎲 点击了 随机答题 按钮...', 'info');
+      randomAnswer();
     });
     const startStudyBtn = document.getElementById('start-study');
     const pauseStudyBtn = document.getElementById('pause-study');
@@ -995,6 +1011,92 @@ logger.info('System initialization completed');
     });
 
     return { text: resultText, count: questions.length };
+  }
+
+  // ================= 随机答题功能 =================
+
+  let isRandomAnswering = false;
+
+  async function randomAnswer() {
+    if (isRandomAnswering) {
+      addLog('随机答题正在进行中...', 'info');
+      return;
+    }
+    isRandomAnswering = true;
+    updateStatus(true);
+    addLog('开始随机答题...', 'info');
+
+    try {
+      const questions = document.querySelectorAll('.TiMu');
+      if (questions.length === 0) {
+        addLog('未找到题目', 'error');
+        isRandomAnswering = false;
+        updateStatus(false);
+        return;
+      }
+
+      addLog(`共找到 ${questions.length} 个题目`, 'info');
+
+      for (let i = 0; i < questions.length; i++) {
+        if (!isRandomAnswering) {
+          addLog('随机答题已暂停', 'info');
+          break;
+        }
+
+        const q = questions[i];
+        const questionType = q.getAttribute('data') || q.querySelector('.newTiMu')?.getAttribute('data') || '0';
+        addLog(`第 ${i + 1} 题类型: ${questionType === '0' ? '单选' : questionType === '1' ? '多选' : questionType === '3' ? '判断' : '未知'}`, 'debug');
+
+        let optionLis;
+        if (questionType === '1') {
+          optionLis = q.querySelectorAll('ul li[onclick*="addMultipleChoice"]');
+        } else {
+          optionLis = q.querySelectorAll('ul li[onclick*="addChoice"]');
+        }
+
+        if (optionLis.length > 0) {
+          if (questionType === '1') {
+            // 多选题随机选2-3个
+            const selectCount = Math.min(Math.floor(Math.random() * 2) + 2, optionLis.length);
+            const indices = [];
+            while (indices.length < selectCount) {
+              const idx = Math.floor(Math.random() * optionLis.length);
+              if (!indices.includes(idx)) indices.push(idx);
+            }
+            indices.forEach(idx => {
+              if (typeof addMultipleChoice === 'function') {
+                addMultipleChoice(optionLis[idx]);
+              } else {
+                optionLis[idx].click();
+              }
+            });
+            addLog(`第 ${i + 1} 题已选择 ${selectCount} 个选项`, 'debug');
+          } else {
+            // 单选题/判断题随机选一个
+            const randomIndex = Math.floor(Math.random() * optionLis.length);
+            if (typeof addChoice === 'function') {
+              addChoice(optionLis[randomIndex]);
+            } else {
+              optionLis[randomIndex].click();
+            }
+            addLog(`第 ${i + 1} 题已随机选择`, 'debug');
+          }
+        } else {
+          addLog(`第 ${i + 1} 题未找到选项`, 'error');
+        }
+
+        if (isRandomAnswering && i < questions.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+      }
+
+      addLog('随机答题完成！', 'success');
+    } catch (error) {
+      addLog(`随机答题出错: ${error.message}`, 'error');
+    } finally {
+      isRandomAnswering = false;
+      updateStatus(false);
+    }
   }
 
   function copyQuestionsToClipboard() {
@@ -1975,7 +2077,6 @@ decryptChaoXingFont().catch(console.error);
 
 
   async function getAnswer(questionInfo) {
-    addLog('========== 开始获取答案 ==========', 'info');
     addLog(`题目类型: ${questionInfo.type}`, 'info');
     addLog(`题目内容: ${questionInfo.question}`, 'info');
 
@@ -1987,49 +2088,53 @@ decryptChaoXingFont().catch(console.error);
     }
 
     try {
+      addLog('🔐 检查访问权限...', 'debug');
       await ensureAccessAllowed();
+      addLog('✅ 访问权限检查通过', 'debug');
     } catch (e) {
-      addLog(`权限检查失败: ${String(e && e.message ? e.message : e)}`, 'error');
+      addLog(`❌ 权限检查失败: ${String(e && e.message ? e.message : e)}`, 'error');
       return null;
     }
 
     const prompt = generatePrompt(questionInfo);
-    addLog('========== 发送到 DeepSeek 的提示词 ==========', 'info');
-    addLog(prompt, 'debug');
-    addLog('==========================================', 'info');
+    addLog('📤 发送到 DeepSeek 的提示词:', 'info');
+    addLog(prompt.substring(0, 200) + '...', 'debug');
 
     try {
       const modelParams = getModelParams(questionInfo.type);
-      addLog(`模型参数: ${JSON.stringify(modelParams, null, 2)}`, 'debug');
+      addLog('⚙️ 模型参数: ' + JSON.stringify(modelParams), 'debug');
 
-      addLog('正在调用 DeepSeek API...', 'info');
+      addLog('🌐 正在调用 DeepSeek API...', 'info');
       const startTime = Date.now();
+
+      addLog('📡 请求数据: ' + JSON.stringify({model: modelParams.model, promptLength: prompt.length}), 'debug');
 
       const data = await deepseekChat([
         { role: "user", content: prompt }
       ], modelParams);
 
       const elapsed = Date.now() - startTime;
-      addLog(`API 调用耗时: ${elapsed}ms`, 'info');
+      addLog(`⏱️ API 调用完成，耗时: ${elapsed}ms`, 'info');
 
       // 显示完整的 API 响应
-      addLog('========== DeepSeek API 原始响应 ==========', 'info');
-      addLog(JSON.stringify(data, null, 2), 'debug');
-      addLog('==========================================', 'info');
+      addLog('📥 API 响应: ' + JSON.stringify(data).substring(0, 200) + '...', 'debug');
 
       if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        addLog('API 响应格式错误: 缺少 choices 或 message', 'error');
+        addLog('❌ API 响应格式错误: 缺少 choices 或 message', 'error');
+        addLog('❌ 完整响应: ' + JSON.stringify(data), 'debug');
         throw new Error('Invalid API response format');
       }
 
       const answer = data.choices[0].message.content.trim();
-      addLog('========== DeepSeek 返回的答案 ==========', 'success');
-      addLog(`原始答案: ${answer}`, 'success');
-      addLog('==========================================', 'success');
+      addLog('═══════════════════════════════════════════', 'info');
+      addLog('📥 DeepSeek 返回的原始答案:', 'success');
+      addLog(answer, 'success');
+      addLog('═══════════════════════════════════════════', 'info');
 
       // 解析答案
+      addLog('🔧 正在解析答案...', 'debug');
       const parsedAnswer = parseAnswer(answer, questionInfo.type);
-      addLog(`解析后的答案: ${parsedAnswer}`, 'info');
+      addLog(`✅ 解析后的答案: "${parsedAnswer}"`, 'info');
 
       return parsedAnswer;
     } catch (error) {
@@ -2086,7 +2191,6 @@ decryptChaoXingFont().catch(console.error);
 
 
   function generatePrompt(questionInfo) {
-    addLog('========== 生成提示词 ==========', 'debug');
 
     let prompt = '';
 
@@ -2190,15 +2294,17 @@ decryptChaoXingFont().catch(console.error);
 
 
   function fillAnswer(answer, questionElement, type) {
-    addLog('========== 开始填写答案 ==========', 'info');
-    addLog(`题目类型: ${type}`, 'info');
-    addLog(`答案内容: ${answer}`, 'info');
-    addLog(`题目元素ID: ${questionElement.id}`, 'debug');
-    addLog(`题目元素类名: ${questionElement.className}`, 'debug');
+    addLog('═══════════════════════════════════════════', 'info');
+    addLog('📝 开始填写答案', 'info');
+    addLog(`🏷️ 题目类型: ${type}`, 'info');
+    addLog(`✍️ 答案内容: "${answer}"`, 'info');
+    addLog(`🔍 题目元素ID: "${questionElement.id}"`, 'debug');
+    addLog(`🔍 题目元素类名: "${questionElement.className}"`, 'debug');
 
     try {
       let filled = false;
       const questionId = questionElement.id;
+      addLog(`📌 题目ID: "${questionId}"`, 'debug');
 
       switch (type) {
         case 'blank':
@@ -2391,18 +2497,32 @@ decryptChaoXingFont().catch(console.error);
             }
           }
 
-          addLog(`========== 答案解析结果 ==========`, 'info');
           addLog(`原始答案: ${answer}`, 'info');
           addLog(`解析后的选项字母: ${answerLetters.join(', ')}`, 'info');
-          addLog(`=================================`, 'info');
+
 
           if (answerLetters.length === 0) {
             addLog(`❌ 无法解析答案选项`, 'error');
             break;
           }
 
-          let foundCount = 0;
-          let clickCount = 0;
+          // 学习通标准方式：使用 addChoice / addMultipleChoice 函数
+          addLog(`🔍 使用学习通标准方式填写答案...`, 'info');
+
+          // 找到题目下的所有选项
+          const allOptions = questionElement.querySelectorAll('ul li');
+          addLog(`📋 找到 ${allOptions.length} 个选项元素`, 'info');
+
+          if (allOptions.length === 0) {
+            // 尝试其他选择器
+            const altOptions = questionElement.querySelectorAll('.Zy_ulTop li, .Py_tk li');
+            addLog(`📋 尝试备用选择器，找到 ${altOptions.length} 个选项`, 'info');
+            if (altOptions.length > 0) {
+              allOptions.push(...altOptions);
+            }
+          }
+
+          let filled = false;
 
           for (const letter of answerLetters) {
             if (!/^[A-Z]$/.test(letter)) {
@@ -2410,122 +2530,95 @@ decryptChaoXingFont().catch(console.error);
               continue;
             }
 
-            addLog(`正在查找并点击选项 ${letter}...`, 'info');
+            addLog(`正在查找选项 ${letter}...`, 'info');
 
-            // 尝试多种选择器方式查找选项
-            const optionSelectors = [
-              // 方式1: 直接通过父级查找
-              `#${questionId} > div.stem_answer > div:nth-child(${letter.charCodeAt(0) - 65 + 1})`,
-              // 方式2: 通过选项文本查找 (包含字母的div)
-              `div:contains("${letter}.")`,
-              // 方式3: 学习通标准结构
-              `.stem_answer > div:nth-child(${letter.charCodeAt(0) - 65 + 1})`,
-              // 方式4: 查找包含选项内容的元素
-              `[class*="option"]:nth-child(${letter.charCodeAt(0) - 65 + 1})`,
-            ];
+            // 查找对应字母的选项
+            for (let i = 0; i < allOptions.length; i++) {
+              const opt = allOptions[i];
+              const dataAttr = opt.querySelector('[data]')?.getAttribute('data');
+              const textContent = opt.textContent || '';
 
-            let optionElement = null;
-            for (const selector of optionSelectors) {
-              try {
-                optionElement = document.querySelector(selector);
-                if (optionElement) {
-                  addLog(`尝试选择器 ${selector} 找到元素`, 'debug');
-                  break;
-                }
-              } catch (e) {
-                // 忽略无效选择器
-              }
-            }
+              addLog(`  检查选项 ${i + 1}: data=${dataAttr}, text=${textContent.substring(0, 20)}...`, 'debug');
 
-            // 如果上面没找到，尝试查找所有选项元素
-            if (!optionElement) {
-              const allOptions = questionElement.querySelectorAll('.stem_answer > div, [class*="option"]');
-              const idx = letter.charCodeAt(0) - 65;
-              if (idx >= 0 && idx < allOptions.length) {
-                optionElement = allOptions[idx];
-                addLog(`通过索引 ${idx} 找到选项元素`, 'debug');
-              }
-            }
+              // 匹配选项字母
+              if (dataAttr === letter || textContent.trim().startsWith(letter)) {
+                addLog(`✅ 找到选项 ${letter}，正在调用 addChoice...`, 'info');
 
-            if (optionElement) {
-              try {
-                // 点击选项
-                optionElement.click();
-                clickCount++;
-                addLog(`✓ 点击选项 ${letter} 成功`, 'success');
-
-                // 尝试找到并点击 input
-                const input = optionElement.querySelector('input[type="radio"], input[type="checkbox"]');
-                if (input) {
-                  if (!input.checked) {
-                    input.click();
-                    input.checked = true;
+                try {
+                  // 调用学习通的 addChoice 函数
+                  if (typeof window.addChoice === 'function') {
+                    window.addChoice(opt);
+                    addLog(`✅ 通过 addChoice 选择选项 ${letter}`, 'success');
+                  } else if (typeof addChoice === 'function') {
+                    addChoice(opt);
+                    addLog(`✅ 通过 addChoice 选择选项 ${letter}`, 'success');
+                  } else {
+                    // 备用：直接点击
+                    opt.click();
+                    addLog(`✅ 通过 click 点击选项 ${letter}`, 'success');
                   }
-                  input.dispatchEvent(new Event('change', { bubbles: true }));
-                  addLog(`✓ 设置 input 选中状态`, 'debug');
+                  filled = true;
+                  break;
+                } catch (e) {
+                  addLog(`❌ 选择选项 ${letter} 失败: ${e.message}`, 'error');
                 }
-
-                // 尝试点击 label
-                const label = optionElement.querySelector('label');
-                if (label) {
-                  label.click();
-                  addLog(`✓ 点击 label`, 'debug');
-                }
-
-                foundCount++;
-                filled = true;
-              } catch (e) {
-                addLog(`❌ 点击选项 ${letter} 失败: ${e.message}`, 'error');
               }
-            } else {
-              addLog(`❌ 未找到选项 ${letter} 对应的元素`, 'error');
-
-              // 打印页面中所有选项供调试
-              const allOptions = questionElement.querySelectorAll('.stem_answer > div, li, [class*="option"]');
-              addLog(`页面中共有 ${allOptions.length} 个选项元素`, 'debug');
-              allOptions.forEach((opt, idx) => {
-                addLog(`  选项${idx}: ${opt.className} - ${opt.innerText.substring(0, 30)}`, 'debug');
-              });
             }
           }
 
-          addLog(`========== 填写结果 ==========`, 'info');
-          addLog(`尝试点击: ${clickCount} 个选项`, 'info');
-          addLog(`成功填写: ${foundCount} 个选项`, 'info');
-          addLog(`=============================`, 'info');
+          // 如果上面的方式没成功，尝试备用方法
+          if (!filled) {
+            addLog('🔄 尝试备用点击方式...', 'info');
+            for (const letter of answerLetters) {
+              const letterIndex = letter.charCodeAt(0) - 65; // A=0, B=1, C=2, ...
+              if (letterIndex < allOptions.length) {
+                const opt = allOptions[letterIndex];
+                try {
+                  if (typeof window.addChoice === 'function') {
+                    window.addChoice(opt);
+                  } else if (typeof addChoice === 'function') {
+                    addChoice(opt);
+                  } else {
+                    opt.click();
+                  }
+                  filled = true;
+                  addLog(`✅ 备用方式选择选项 ${letter} 成功`, 'success');
+                } catch (e) {
+                  addLog(`❌ 备用方式选择失败: ${e.message}`, 'error');
+                }
+              }
+            }
+          }
+
+          if (filled) {
+            addLog('✅ 答案填写成功', 'success');
+          } else {
+            addLog('❌ 答案填写失败，未找到选项', 'error');
+          }
           break;
         }
-        default:
-          break;
+
+          try {
+            const submitButtons = [
+              ...questionElement.querySelectorAll('button[type="submit"]'),
+              ...questionElement.querySelectorAll('input[type="submit"]'),
+              ...questionElement.querySelectorAll('.submit-btn'),
+              ...questionElement.querySelectorAll('.save-btn'),
+              ...questionElement.querySelectorAll('[class*="submit"]'),
+              ...questionElement.querySelectorAll('[class*="save"]')
+            ];
+
+            if (submitButtons.length > 0) {
+              submitButtons[0].click();
+              addLog('触发了提交按钮', 'debug');
+            }
+          } catch (e) {
+            addLog(`触发提交按钮失败: ${e.message}`, 'debug');
+          }
+
       }
-
-      if (filled) {
-        addLog(`答案填写成功`, 'success');
-      } else {
-        addLog(`答案可能未成功填写，请检查`, 'error');
-      }
-
-
-      try {
-        const submitButtons = [
-          ...questionElement.querySelectorAll('button[type="submit"]'),
-          ...questionElement.querySelectorAll('input[type="submit"]'),
-          ...questionElement.querySelectorAll('.submit-btn'),
-          ...questionElement.querySelectorAll('.save-btn'),
-          ...questionElement.querySelectorAll('[class*="submit"]'),
-          ...questionElement.querySelectorAll('[class*="save"]')
-        ];
-
-        if (submitButtons.length > 0) {
-          submitButtons[0].click();
-          addLog('触发了提交按钮', 'debug');
-        }
-      } catch (e) {
-        addLog(`触发提交按钮失败: ${e.message}`, 'debug');
-      }
-
-    } catch (error) {
-      addLog(`答案填写失败: ${error.message}`, 'error');
+    } catch {
+      addLog('未找到题目元素或答案元素', 'error');
     }
   }
 
@@ -2755,36 +2848,40 @@ decryptChaoXingFont().catch(console.error);
     }
   }
 
-
+// 自动答题
   async function autoAnswer() {
+    addLog('🔍 [autoAnswer] 函数被调用', 'debug');
+
     if (isAnswering) {
-      addLog('自动答题已经在运行中...', 'info');
+      addLog('⚠️ 自动答题已经在运行中，请勿重复点击', 'warn');
       return;
     }
 
     isAnswering = true;
     updateStatus(true);
-    addLog('═══════════════════════════════════════════', 'info');
-    addLog('🚀 开始自动答题', 'info');
-    addLog('═══════════════════════════════════════════', 'info');
+    addLog('🚀 开始 AI 自动答题', 'info');
 
     try {
 
-      addLog('当前页面URL: ' + window.location.href, 'info');
-      addLog('当前页面标题: ' + document.title, 'info');
+      addLog('📱 当前页面URL: ' + window.location.href, 'info');
+      addLog('📄 当前页面标题: ' + document.title, 'info');
 
       // 检查 API Key 是否已配置
       const apiKey = getDeepSeekApiKey();
+      addLog('🔑 检查 API Key 配置...', 'debug');
       if (!apiKey) {
-        addLog('⚠️ 尚未配置 DeepSeek API Key', 'error');
-        addLog('请点击"配置API Key"按钮设置您的 API Key', 'error');
+        addLog('❌ 尚未配置 DeepSeek API Key', 'error');
+        addLog('💡 请点击"配置API Key"按钮设置您的 API Key', 'info');
+        addLog('💡 或者点击"随机答题"按钮进行随机答题', 'info');
         isAnswering = false;
         updateStatus(false);
         return;
       }
-      addLog('✓ DeepSeek API Key 已配置', 'success');
+      addLog('✅ DeepSeek API Key 已配置', 'success');
+      addLog('🔑 API Key 长度: ' + apiKey.length + ' 字符', 'debug');
 
       // 优先使用学习通标准选择器（参考 jm.user.js 的成功经验）
+      addLog('🔍 正在搜索题目元素...', 'info');
       const possibleSelectors = [
         '.TiMu',                    // 学习通标准题目类名（最优先，来自 jm.user.js）
         '.questionLi',              // 常见题目列表项
@@ -2804,11 +2901,15 @@ decryptChaoXingFont().catch(console.error);
 
       let questions = [];
       let foundSelector = '';
+      let selectorTested = 0;
       for (let selector of possibleSelectors) {
-        questions = document.querySelectorAll(selector);
-        if (questions.length > 0) {
+        selectorTested++;
+        const tempQuestions = document.querySelectorAll(selector);
+        addLog(`🔎 测试选择器 [${selectorTested}/${possibleSelectors.length}]: "${selector}" -> 找到 ${tempQuestions.length} 个`, 'debug');
+        if (tempQuestions.length > 0) {
+          questions = tempQuestions;
           foundSelector = selector;
-          addLog(`✓ 使用选择器 "${selector}" 找到 ${questions.length} 个题目`, 'success');
+          addLog(`✅ 成功! 使用选择器 "${selector}" 找到 ${questions.length} 个题目`, 'success');
           break;
         }
       }
@@ -2846,9 +2947,8 @@ decryptChaoXingFont().catch(console.error);
       }
 
 
-      addLog('═══════════════════════════════════════════', 'info');
       addLog(`📋 共找到 ${questions.length} 个题目，准备开始答题`, 'info');
-      addLog('═══════════════════════════════════════════', 'info');
+
 
       Array.from(questions).forEach((q, idx) => {
         addLog(`  题目 ${idx + 1}: ${q.className} | ID: ${q.id}`, 'debug');
@@ -2856,6 +2956,8 @@ decryptChaoXingFont().catch(console.error);
 
       let successCount = 0;
       let failCount = 0;
+
+      addLog(`✅ 准备开始处理 ${questions.length} 道题目`, 'info');
 
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i];
@@ -2865,19 +2967,25 @@ decryptChaoXingFont().catch(console.error);
         }
 
         addLog('───────────────────────────────────────────', 'info');
-        addLog(`📝 正在处理第 ${i + 1}/${questions.length} 题`, 'info');
+        addLog(`📝 【第 ${i + 1}/${questions.length} 题】开始处理`, 'info');
+        addLog(`🔍 题目元素: ${question.className}`, 'debug');
 
         const questionInfo = getQuestionInfo(question);
+        addLog('📋 getQuestionInfo 返回: ' + JSON.stringify(questionInfo ? {type: questionInfo.type, question: questionInfo.question?.substring(0,30), optionsLen: questionInfo.options?.length} : null), 'debug');
+
         if (!questionInfo || !questionInfo.question) {
-          addLog(`❌ 题目信息获取失败，跳过`, 'error');
+          addLog(`❌ 题目信息获取失败，跳过本题`, 'error');
           failCount++;
           continue;
         }
 
-        addLog(`题目内容: ${questionInfo.question.substring(0, 50)}...`, 'info');
-        addLog(`题目类型: ${questionInfo.type}`, 'info');
+        addLog(`📄 题目内容: ${questionInfo.question.substring(0, 50)}...`, 'info');
+        addLog(`🏷️ 题目类型: ${questionInfo.type}`, 'info');
         if (questionInfo.options && questionInfo.options.length > 0) {
-          addLog(`选项数量: ${questionInfo.options.length}`, 'info');
+          addLog(`📋 选项数量: ${questionInfo.options.length}`, 'info');
+          questionInfo.options.forEach((opt, idx) => {
+            addLog(`   选项${String.fromCharCode(65+idx)}: ${opt.substring(0, 30)}...`, 'debug');
+          });
         }
 
         // 调用 DeepSeek API 获取答案
@@ -2885,29 +2993,29 @@ decryptChaoXingFont().catch(console.error);
         const answer = await getAnswer(questionInfo);
 
         if (answer) {
-          addLog(`✅ DeepSeek 返回答案: ${answer}`, 'success');
+          addLog(`✅ DeepSeek 返回答案: "${answer}"`, 'success');
           addLog('📝 正在填写答案...', 'info');
           fillAnswer(answer, question, questionInfo.type);
           successCount++;
+          addLog(`✅ 第 ${i + 1} 题完成!`, 'success');
         } else {
-          addLog(`❌ 获取答案失败`, 'error');
+          addLog(`❌ 第 ${i + 1} 题获取答案失败`, 'error');
           failCount++;
         }
 
         // 显示进度
-        addLog(`📊 进度: ${successCount} 成功, ${failCount} 失败`, 'info');
-        addLog('───────────────────────────────────────────', 'info');
+        addLog(`📊 当前进度: ${successCount} 成功 / ${failCount} 失败`, 'info');
+
 
         if (isAnswering) {
+          addLog('⏳ 等待2秒后处理下一题...', 'debug');
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
 
-      addLog('═══════════════════════════════════════════', 'info');
-      addLog(`🎉 答题完成！`, 'success');
-      addLog(`   成功: ${successCount} 题`, 'success');
-      addLog(`   失败: ${failCount} 题`, 'info');
-      addLog('═══════════════════════════════════════════', 'info');
+      addLog(`🎉 AI 答题完成!`, 'success');
+      addLog(`   ✅ 成功: ${successCount} 题`, 'success');
+      addLog(`   ❌ 失败: ${failCount} 题`, 'info');
     } catch (error) {
       addLog(`❌ 自动答题过程出错: ${error.message}`, 'error');
       addLog(`错误堆栈: ${error.stack}`, 'debug');
