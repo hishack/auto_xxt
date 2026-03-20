@@ -1212,50 +1212,104 @@ logger.info('System initialization completed');
     try {
       const videos = doc.querySelectorAll('video, .video-js video');
       if (videos.length === 0) return false;
+
       let any = false;
+
       videos.forEach(v => {
         try {
+          // 基础设置
           v.muted = true;
-          if (!Number.isNaN(v.playbackRate)) v.playbackRate = currentPlaybackSpeed;
-          const p = v.play(); if (p && typeof p.catch === 'function') p.catch(() => { });
-
+          if (!Number.isNaN(v.playbackRate)) {
+            v.playbackRate = currentPlaybackSpeed;
+          }
           v.loop = false;
+
+
+          if (v.paused) {
+            const p = v.play();
+            if (p && typeof p.catch === 'function') {
+              p.catch(() => { });
+            }
+          }
+
+
+          if (!v.dataset.autoResumeBind) {
+            v.dataset.autoResumeBind = '1';
+
+            v.addEventListener('pause', () => {
+              if (!isStudyingChapters) return;
+
+              setTimeout(() => {
+                if (v.paused) {
+                  addLog('检测到视频被暂停，尝试恢复播放', 'warning');
+                  v.play().catch(() => { });
+                }
+              }, 1000);
+            });
+          }
+
+
+          if (!v.dataset.forcePlayInterval) {
+            v.dataset.forcePlayInterval = '1';
+
+            setInterval(() => {
+              if (isStudyingChapters && v.paused) {
+                v.play().catch(() => { });
+              }
+            }, 2000);
+          }
 
 
           if (!v.dataset.autonextBind) {
             v.dataset.autonextBind = '1';
 
-
             v.addEventListener('ended', () => {
               if (v.dataset.disableAutoNext === '1' || !isStudyingChapters) return;
+
               addLog('视频播放结束，进行完成度检测', 'success');
               setTimeout(() => ensureSectionCompletedAndAdvance(doc), 300);
             }, { passive: true });
 
-
             let nearingFired = false;
+
             const onTimeUpdate = () => {
               if (v.dataset.disableAutoNext === '1' || !isStudyingChapters) return;
+
               try {
                 const d = v.duration || 0;
                 const t = v.currentTime || 0;
+
                 if (d > 0 && (d - t) <= 1.0 && !nearingFired) {
                   nearingFired = true;
+
                   addLog('检测到视频即将结束，进行完成度检测', 'debug');
-                  setTimeout(() => ensureSectionCompletedAndAdvance(doc), 800);
+
+                  setTimeout(() => {
+                    ensureSectionCompletedAndAdvance(doc);
+                  }, 800);
                 }
               } catch { }
             };
+
             v.addEventListener('timeupdate', onTimeUpdate, { passive: true });
           }
+
           any = true;
+
         } catch { }
       });
 
-      const popBtns = doc.querySelectorAll('.ans-job-icon, .popBtn, .dialog-footer .btn, .ans-modal .btn, .vjs-big-play-button');
+      // ⭐ 自动点击弹窗
+      const popBtns = doc.querySelectorAll(
+        '.ans-job-icon, .popBtn, .dialog-footer .btn, .ans-modal .btn, .vjs-big-play-button'
+      );
       popBtns.forEach(b => safeClick(b));
+
       return any;
-    } catch { return false; }
+
+    } catch {
+      return false;
+    }
   }
 
 
